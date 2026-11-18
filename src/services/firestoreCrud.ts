@@ -29,7 +29,9 @@ import {
 } from '../firebase';
 import {
   AcademicEvent,
+  AlumniTracer,
   AnalyticsEvent,
+  ContactMessage,
   EditorialArticle,
   FaqItem,
   NewsItem,
@@ -551,6 +553,63 @@ export async function savePpdbRegistration(
     }
   } catch (error) {
     handleFirestoreError(error, existingId ? OperationType.UPDATE : OperationType.CREATE, path);
+  }
+}
+
+export async function saveAlumniTracer(
+  actor: User,
+  tracer: Omit<AlumniTracer, 'id' | 'ownerId' | 'createdAt' | 'updatedAt'>,
+  existingId?: string
+): Promise<void> {
+  const id = existingId || generateSafeDocId('trc');
+  const path = `alumni_tracer/${id}`;
+  const cleanYear = /^(20[0-3][0-9])$/.test(tracer.graduationYear.trim())
+    ? tracer.graduationYear.trim()
+    : String(new Date().getFullYear());
+  try {
+    const payload = {
+      fullName: clampStr(tracer.fullName, 140),
+      graduationYear: cleanYear,
+      programCode: tracer.programCode,
+      activityStatus: tracer.activityStatus,
+      institution: clampStr(tracer.institution, 160),
+      whatsapp: clampStr(tracer.whatsapp, 24),
+      status: tracer.status,
+      notes: clampStr(tracer.notes, 400),
+      updatedAt: serverTimestamp(),
+    };
+    if (existingId) {
+      await updateDoc(doc(db, 'alumni_tracer', id), payload);
+      await logAuditAction(actor, 'update', 'alumni_tracer', `${payload.fullName} (${payload.status})`);
+    } else {
+      await setDoc(doc(db, 'alumni_tracer', id), {
+        ...payload,
+        ownerId: actor.uid,
+        createdAt: serverTimestamp(),
+      });
+      await logAuditAction(actor, 'create', 'alumni_tracer', payload.fullName);
+    }
+  } catch (error) {
+    handleFirestoreError(error, existingId ? OperationType.UPDATE : OperationType.CREATE, path);
+  }
+}
+
+export async function saveContactMessage(
+  actor: User,
+  msg: Pick<ContactMessage, 'status' | 'replyNote'>,
+  existingId: string,
+  senderLabel: string
+): Promise<void> {
+  const path = `contact_messages/${existingId}`;
+  try {
+    await updateDoc(doc(db, 'contact_messages', existingId), {
+      status: msg.status,
+      replyNote: clampStr(msg.replyNote, 500),
+      updatedAt: serverTimestamp(),
+    });
+    await logAuditAction(actor, 'update', 'contact_messages', `${senderLabel} (${msg.status})`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 

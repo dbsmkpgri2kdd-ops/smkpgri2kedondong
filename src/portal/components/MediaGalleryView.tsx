@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Clapperboard, ExternalLink, Newspaper, Play, RefreshCw } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, Clapperboard, ExternalLink, Newspaper, Play, RefreshCw, Search } from 'lucide-react';
 import { ADSENSE_CONFIG, SCHOOL_IDENTITY, SCHOOL_NEWS } from '../data/schoolData';
 import { extractYouTubeId, isExternalBlockedForIframe } from '../services/schoolApi';
 import { PublicSiteIdentity } from '../services/usePortalData';
-import { DynamicPortalItem, SchoolNewsItem } from '../types/portal';
+import { DynamicPortalItem, PortalRoute, SchoolNewsItem } from '../types/portal';
 import { AdsenseSlot } from './AdsenseSlot';
+import { NewsReaderModal } from './NewsReaderModal';
 import { PortalIconBadge } from './PortalIconBadge';
 
 interface MediaGalleryViewProps {
@@ -14,6 +15,7 @@ interface MediaGalleryViewProps {
   onOpenExternal: (title: string, url: string) => void;
   news?: SchoolNewsItem[];
   siteIdentity?: PublicSiteIdentity;
+  onNavigate?: (route: PortalRoute) => void;
 }
 
 export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
@@ -23,9 +25,31 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
   onOpenExternal,
   news = SCHOOL_NEWS,
   siteIdentity,
+  onNavigate,
 }) => {
   const [playingVideos, setPlayingVideos] = useState<Record<string, boolean>>({});
   const [failedThumbs, setFailedThumbs] = useState<Record<string, boolean>>({});
+  const [newsSearch, setNewsSearch] = useState('');
+  const [newsCategory, setNewsCategory] = useState('Semua');
+  const [activeNews, setActiveNews] = useState<SchoolNewsItem | null>(null);
+
+  const newsCategories = useMemo(() => {
+    const cats = Array.from(new Set(news.map((n) => n.category).filter(Boolean)));
+    return ['Semua', ...cats];
+  }, [news]);
+
+  const filteredNews = useMemo(() => {
+    const q = newsSearch.trim().toLowerCase();
+    return news.filter((item) => {
+      const okCat = newsCategory === 'Semua' || item.category === newsCategory;
+      const okQuery =
+        !q ||
+        item.title.toLowerCase().includes(q) ||
+        item.summary.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q);
+      return okCat && okQuery;
+    });
+  }, [news, newsCategory, newsSearch]);
 
   const socialUrls = siteIdentity?.social || SCHOOL_IDENTITY.social;
   const officialSocials = [
@@ -281,33 +305,97 @@ export const MediaGalleryView: React.FC<MediaGalleryViewProps> = ({
       {/* School News Archive */}
       <section className="border-t border-slate-200 bg-white py-14">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-700 uppercase">
-            <Newspaper className="h-4 w-4" />
-            Warta &amp; Agenda Sekolah
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-blue-700 uppercase">
+                <Newspaper className="h-4 w-4" />
+                Warta &amp; Agenda Sekolah
+              </div>
+              <h2 className="mt-2 font-display text-xl font-bold text-slate-950">
+                Siaran Informasi &amp; Pengumuman Terbaru
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[210px]">
+                <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={newsSearch}
+                  onChange={(e) => setNewsSearch(e.target.value)}
+                  placeholder="Cari warta atau pengumuman..."
+                  aria-label="Cari warta sekolah"
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-9 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-700 focus:outline-none"
+                />
+              </div>
+            </div>
           </div>
-          <h2 className="mt-2 font-display text-xl font-bold text-slate-950">
-            Siaran Informasi &amp; Pengumuman Terbaru
-          </h2>
-          <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
-            {news.map((item) => (
-              <article
-                key={item.id}
-                className="rounded-xl border border-slate-200 bg-slate-50/70 p-5"
-              >
-                <p className="text-xs text-slate-500">
-                  <span className="font-semibold text-blue-700">{item.category}</span>
-                  {' · '}
-                  {item.date}
-                </p>
-                <h3 className="mt-2 font-display text-base font-bold leading-snug text-slate-950">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.summary}</p>
-              </article>
-            ))}
-          </div>
+
+          {newsCategories.length > 1 && (
+            <div className="mt-5 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter kategori berita">
+              {newsCategories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  role="tab"
+                  aria-selected={newsCategory === cat}
+                  onClick={() => setNewsCategory(cat)}
+                  className={`cursor-pointer whitespace-nowrap shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    newsCategory === cat
+                      ? 'bg-slate-900 text-white'
+                      : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-white hover:text-slate-950'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {filteredNews.length > 0 ? (
+            <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+              {filteredNews.map((item) => (
+                <article
+                  key={item.id}
+                  className="flex flex-col justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-5 transition-colors hover:border-slate-300 hover:bg-white"
+                >
+                  <div>
+                    <p className="text-xs text-slate-500">
+                      <span className="font-semibold text-blue-700">{item.category}</span>
+                      {' · '}
+                      {item.date}
+                    </p>
+                    <h3 className="mt-2 font-display text-base font-bold leading-snug text-slate-950">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.summary}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNews(item)}
+                    className="mt-4 inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Baca Warta Lengkap
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+              Tidak ada berita yang sesuai dengan kata kunci pencarian Anda.
+            </div>
+          )}
         </div>
       </section>
+
+      {activeNews && (
+        <NewsReaderModal
+          item={activeNews}
+          onClose={() => setActiveNews(null)}
+          onNavigate={onNavigate}
+        />
+      )}
     </div>
   );
 };

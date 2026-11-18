@@ -18,6 +18,7 @@ import {
 import { PublicSiteIdentity } from '../services/usePortalData';
 import { PortalRoute, SchoolNewsItem, StudyProgram } from '../types/portal';
 import { AdsenseSlot } from './AdsenseSlot';
+import { NewsReaderModal } from './NewsReaderModal';
 import { ServiceSubTab } from './PortalHeader';
 
 interface HomeSummaryViewProps {
@@ -36,6 +37,7 @@ export const HomeSummaryView: React.FC<HomeSummaryViewProps> = ({
   siteIdentity,
 }) => {
   const [heroImgError, setHeroImgError] = useState(false);
+  const [activeNews, setActiveNews] = useState<SchoolNewsItem | null>(null);
   const schoolName = siteIdentity?.name || SCHOOL_IDENTITY.name;
   const npsn = siteIdentity?.npsn || SCHOOL_IDENTITY.npsn;
   const announcementBanner = siteIdentity?.announcementBanner?.trim();
@@ -334,7 +336,7 @@ export const HomeSummaryView: React.FC<HomeSummaryViewProps> = ({
             {news.slice(0, 6).map((item) => (
               <article
                 key={item.id}
-                className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5"
+                className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 transition-colors hover:border-slate-300"
               >
                 <div>
                   <p className="text-xs text-slate-500">
@@ -347,18 +349,35 @@ export const HomeSummaryView: React.FC<HomeSummaryViewProps> = ({
                   </h3>
                   <p className="mt-2 text-xs leading-relaxed text-slate-600">{item.summary}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('media')}
-                  className="mt-4 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800"
-                >
-                  Lihat di Media Sekolah <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveNews(item)}
+                    className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Baca Selengkapnya <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('media')}
+                    className="cursor-pointer text-xs font-medium text-slate-500 hover:text-slate-900"
+                  >
+                    Arsip Media
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         </div>
       </section>
+
+      {activeNews && (
+        <NewsReaderModal
+          item={activeNews}
+          onClose={() => setActiveNews(null)}
+          onNavigate={onNavigate}
+        />
+      )}
     </div>
   );
 };

@@ -89,7 +89,9 @@ export function resolveAssetUrl(url?: string): string {
 export const HERO_MEDIA = {
   campus: withBase('src/assets/images/hero_campus_clean_1794883667495.jpg'),
   automotiveLab: withBase('src/assets/images/lab_engineering_automotive_1794883647783.jpg'),
+  automotiveDiagnostic: withBase('src/assets/images/vocational_automotive_lab_1794995572022.jpg'),
   networkLab: withBase('src/assets/images/lab_network_digital_1794883648012.jpg'),
+  networkStudio: withBase('src/assets/images/vocational_network_studio_1794995573318.jpg'),
   electronicsStudio: withBase('src/assets/images/studio_electronics_banking_1794883647802.jpg'),
 };
 
@@ -177,30 +179,42 @@ export const SCHOOL_FACILITIES: SchoolFacility[] = [
     unit: '2 Unit Bengkel Terpisah',
     description:
       'Dilengkapi car lift, scanner diagnostik injeksi EFI/OBD-II, bike lift sepeda motor, peralatan servis CVT, serta papan perkakas standar bengkel resmi.',
+    image: HERO_MEDIA.automotiveLab,
   },
   {
     name: 'Laboratorium Komputer, Server & Fiber Optik',
     unit: 'Lab TKJ & Studio Digital',
     description:
       'Perangkat workstation desktop, rak server jaringan, router MikroTik, fusion splicer fiber optik FTTH, dan koneksi internet berkecepatan tinggi.',
+    image: HERO_MEDIA.networkLab,
   },
   {
     name: 'Workshop Elektronika & Studio Audio Video',
     unit: 'Bengkel Praktik TAV',
     description:
       'Meja praktik elektronika lengkap dengan osiloskop digital, multimeter presisi, stasiun solder, audio mixer konsol, serta perangkat tata suara lapangan.',
+    image: HERO_MEDIA.electronicsStudio,
   },
   {
     name: 'Studio Pemasaran & Kewirausahaan Digital',
     unit: 'Lab Bisnis Digital',
     description:
       'Ruang praktik foto produk UMKM, produksi konten promosi, pengelolaan katalog toko daring, dan simulasi layanan pelanggan digital.',
+    image: HERO_MEDIA.networkStudio,
+  },
+  {
+    name: 'Area Diagnostik Kelistrikan & Injeksi Modern',
+    unit: 'Zona Praktik Terpadu',
+    description:
+      'Unit trainer kelistrikan bodi, mesin injeksi PGM-FI, sistem pendingin kabin, serta alat uji emisi dan pengisian baterai.',
+    image: HERO_MEDIA.automotiveDiagnostic,
   },
   {
     name: 'Perpustakaan, Ruang Kelas & Sarana Ibadah',
     unit: 'Area Kampus 8.000 m²',
     description:
       'Ruang belajar representatif, perpustakaan koleksi buku kejuruan, lapangan olahraga serbaguna, mushola sekolah, dan area parkir tertib.',
+    image: HERO_MEDIA.campus,
   },
 ];
 
@@ -209,31 +223,37 @@ export const EXTRACURRICULARS: Extracurricular[] = [
     name: 'Pramuka Penegak',
     schedule: 'Jumat · 14.30 WIB',
     focus: 'Kepemimpinan, kemandirian, dan pengabdian masyarakat.',
+    category: 'kepemimpinan',
   },
   {
     name: 'Paskibra Sekolah',
     schedule: 'Sabtu · 08.00 WIB',
     focus: 'Kedisiplinan baris-berbaris dan tata upacara bendera.',
+    category: 'kepemimpinan',
   },
   {
     name: 'Rohani Islam (Rohis)',
     schedule: 'Jumat · 13.00 WIB',
     focus: 'Pembinaan akhlak, kajian keagamaan, dan kegiatan sosial.',
+    category: 'kepemimpinan',
   },
   {
     name: 'Klub IT, Jaringan & Multimedia',
     schedule: 'Rabu · 14.30 WIB',
     focus: 'Persiapan Lomba Kompetensi Siswa (LKS), desain, dan jaringan.',
+    category: 'keahlian',
   },
   {
     name: 'Olahraga Prestasi (Futsal & Voli)',
     schedule: 'Selasa & Kamis · 15.00 WIB',
     focus: 'Kebugaran jasmani, sportivitas, dan turnamen antar-pelajar.',
+    category: 'keahlian',
   },
   {
     name: 'Palang Merah Remaja (PMR)',
     schedule: 'Sabtu · 10.00 WIB',
     focus: 'Pertolongan pertama, kesehatan sekolah, dan tanggap darurat.',
+    category: 'kepemimpinan',
   },
 ];
 
@@ -286,6 +306,7 @@ export const SCHOOL_NEWS: SchoolNewsItem[] = [
     title: 'Informasi Pra-Pendaftaran SPMB SMK PGRI 2 Kedondong Tahun Ajaran Baru Dibuka',
     summary:
       'Calon peserta didik lulusan SMP/MTs kini dapat mengisi formulir pra-pendaftaran secara daring untuk 5 program keahlian unggulan.',
+    image: HERO_MEDIA.campus,
   },
   {
     id: 'persiapan-ukk',
@@ -294,6 +315,7 @@ export const SCHOOL_NEWS: SchoolNewsItem[] = [
     title: 'Pemantapan Praktik Bengkel & Laboratorium Menjelang Uji Kompetensi Keahlian',
     summary:
       'Siswa kelas XII dari jurusan TKR, TSM, TKJ, TAV, dan Bisnis Digital mengikuti pendampingan intensif standar penguji industri.',
+    image: HERO_MEDIA.automotiveLab,
   },
   {
     id: 'portal-prida-baru',
@@ -302,6 +324,7 @@ export const SCHOOL_NEWS: SchoolNewsItem[] = [
     title: 'Pembaruan Portal Digital smkpgri2kedondong.sch.id Terintegrasi Layanan Akademik',
     summary:
       'Portal resmi kini menyediakan fitur cek pengumuman UKK, direktori PTK, tracer alumni BKK, dan pusat literasi kejuruan.',
+    image: HERO_MEDIA.networkLab,
   },
 ];
 

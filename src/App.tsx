@@ -17,6 +17,7 @@ import {
   ExternalLink,
   FileEdit,
   GraduationCap,
+  Inbox,
   LogOut,
   Menu,
   Moon,
@@ -27,6 +28,7 @@ import {
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ContentManager } from './components/ContentManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { InboxManager } from './components/InboxManager';
 import { PpdbManager } from './components/PpdbManager';
 import { UserManager } from './components/UserManager';
 import { stripBasePath, withBase } from './portal/data/schoolData';
@@ -35,8 +37,6 @@ import {
   auth,
   db,
   googleProvider,
-  handleFirestoreError,
-  OperationType,
   PRIMARY_ADMIN_EMAIL,
   testConnection,
 } from './firebase';
@@ -44,9 +44,11 @@ import { bootstrapUserProfile, seedInitialPortalData } from './services/firestor
 import {
   AcademicEvent,
   AdminTab,
+  AlumniTracer,
   AnalyticsDaily,
   AnalyticsEvent,
   AuditLog,
+  ContactMessage,
   EditorialArticle,
   FaqItem,
   NewsItem,
@@ -61,6 +63,7 @@ const NAV_ITEMS: Array<{ id: AdminTab; label: string; icon: React.ComponentType<
   { id: 'analytics', label: 'Dasbor Analitik', icon: BarChart3 },
   { id: 'content', label: 'Edit Konten Portal', icon: FileEdit },
   { id: 'ppdb', label: 'Pendaftar PPDB', icon: GraduationCap },
+  { id: 'inbox', label: 'Alumni & Pesan', icon: Inbox },
   { id: 'users', label: 'Manajemen Pengguna', icon: Users },
 ];
 
@@ -91,6 +94,8 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
   const [academicEvents, setAcademicEvents] = useState<AcademicEvent[]>([]);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [ppdbList, setPpdbList] = useState<PpdbRegistration[]>([]);
+  const [alumniList, setAlumniList] = useState<AlumniTracer[]>([]);
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<AnalyticsDaily[]>([]);
   const [liveEvents, setLiveEvents] = useState<AnalyticsEvent[]>([]);
@@ -244,6 +249,28 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
 
     unsubs.push(
       onSnapshot(
+        makeQuery('alumni_tracer', true, 120),
+        (snap) =>
+          setAlumniList(
+            snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AlumniTracer, 'id'>) }))
+          ),
+        onListenerError('alumni_tracer')
+      )
+    );
+
+    unsubs.push(
+      onSnapshot(
+        makeQuery('contact_messages', true, 120),
+        (snap) =>
+          setContactMessages(
+            snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ContactMessage, 'id'>) }))
+          ),
+        onListenerError('contact_messages')
+      )
+    );
+
+    unsubs.push(
+      onSnapshot(
         usersQuery,
         (snap) =>
           setUsersList(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserProfile, 'id'>) }))),
@@ -382,6 +409,9 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
     );
   }
 
+  const inboxUnreadCount =
+    contactMessages.filter((m) => m.status === 'baru').length +
+    alumniList.filter((a) => a.status === 'menunggu').length;
   const activeNav = NAV_ITEMS.find((n) => n.id === activeTab)!;
 
   return (
@@ -409,19 +439,32 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const pendingCount =
+              item.id === 'inbox'
+                ? inboxUnreadCount
+                : item.id === 'ppdb'
+                  ? ppdbList.filter((p) => p.status === 'menunggu').length
+                  : 0;
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                   isActive
                     ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
+                <span className="flex items-center gap-3 min-w-0">
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </span>
+                {pendingCount > 0 && (
+                  <span className="font-mono text-[11px] font-semibold tabular-nums text-blue-700 dark:text-blue-300 shrink-0">
+                    {pendingCount}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -481,6 +524,12 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
             <nav className="flex-1 p-3 space-y-1">
               {NAV_ITEMS.map((item) => {
                 const Icon = item.icon;
+                const pendingCount =
+                  item.id === 'inbox'
+                    ? inboxUnreadCount
+                    : item.id === 'ppdb'
+                      ? ppdbList.filter((p) => p.status === 'menunggu').length
+                      : 0;
                 return (
                   <button
                     key={item.id}
@@ -489,14 +538,21 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
                       setActiveTab(item.id);
                       setMobileNavOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg ${
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium rounded-lg ${
                       activeTab === item.id
                         ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
                         : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <span className="flex items-center gap-3 min-w-0">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    {pendingCount > 0 && (
+                      <span className="font-mono text-[11px] font-semibold tabular-nums text-blue-700 dark:text-blue-300 shrink-0">
+                        {pendingCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -622,6 +678,8 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
                   articles={articles}
                   ptkMembers={ptkMembers}
                   ppdbList={ppdbList}
+                  alumniList={alumniList}
+                  contactMessages={contactMessages}
                   onSeedData={handleSeedData}
                   seeding={seeding}
                   onNotify={showToast}
@@ -646,6 +704,15 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
                 <PpdbManager
                   currentUser={user}
                   registrations={ppdbList}
+                  onNotify={showToast}
+                />
+              )}
+
+              {activeTab === 'inbox' && (
+                <InboxManager
+                  currentUser={user}
+                  messages={contactMessages}
+                  alumniList={alumniList}
                   onNotify={showToast}
                 />
               )}

@@ -1,10 +1,11 @@
-import React from 'react';
-import { Award, Building2, CheckCircle2, Handshake, Wrench } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Award, Building2, CheckCircle2, Copy, Handshake, Wrench } from 'lucide-react';
 import {
   ADSENSE_CONFIG,
   EXTRACURRICULARS,
   HISTORY_PARAGRAPHS,
   INDUSTRY_PARTNERS,
+  resolveAssetUrl,
   SCHOOL_FACILITIES,
   SCHOOL_IDENTITY,
   VISION_MISSION,
@@ -16,7 +17,12 @@ interface ProfileFullViewProps {
   siteIdentity?: PublicSiteIdentity;
 }
 
+type EkskulFilter = 'semua' | 'kepemimpinan' | 'keahlian';
+
 export const ProfileFullView: React.FC<ProfileFullViewProps> = ({ siteIdentity }) => {
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [ekskulFilter, setEkskulFilter] = useState<EkskulFilter>('semua');
+
   const npsn = siteIdentity?.npsn || SCHOOL_IDENTITY.npsn;
   const officialName = siteIdentity?.officialName || SCHOOL_IDENTITY.officialName;
   const schoolName = siteIdentity?.name || SCHOOL_IDENTITY.name;
@@ -31,6 +37,22 @@ export const ProfileFullView: React.FC<ProfileFullViewProps> = ({ siteIdentity }
     siteIdentity?.principalGreeting || VISION_MISSION.principalNote.greeting;
   const principalClosing =
     siteIdentity?.principalClosing || VISION_MISSION.principalNote.closing;
+
+  const filteredExtracurriculars = useMemo(() => {
+    if (ekskulFilter === 'semua') return EXTRACURRICULARS;
+    return EXTRACURRICULARS.filter((e) => e.category === ekskulFilter);
+  }, [ekskulFilter]);
+
+  const handleCopyAddress = async () => {
+    const fullAddress = `${officialName} (NPSN ${npsn}), ${address}, Kec. Kedondong, Kab. Pesawaran, Lampung 35381`;
+    try {
+      await navigator.clipboard.writeText(fullAddress);
+      setCopiedAddress(true);
+      window.setTimeout(() => setCopiedAddress(false), 2500);
+    } catch {
+      // Clipboard API unavailable
+    }
+  };
 
   const identityRows = [
     { label: 'Nama Sekolah', value: officialName },
@@ -133,9 +155,19 @@ export const ProfileFullView: React.FC<ProfileFullViewProps> = ({ siteIdentity }
 
             <div className="lg:col-span-5">
               <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7">
-                <h3 className="font-display text-lg font-bold text-slate-950">
-                  Identitas Resmi Satuan Pendidikan
-                </h3>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-display text-lg font-bold text-slate-950">
+                    Identitas Resmi Satuan Pendidikan
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleCopyAddress}
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    {copiedAddress ? 'Tersalin' : 'Salin Alamat'}
+                  </button>
+                </div>
                 <dl className="mt-4 divide-y divide-slate-100 text-sm">
                   {identityRows.map((row) => (
                     <div
@@ -179,20 +211,36 @@ export const ProfileFullView: React.FC<ProfileFullViewProps> = ({ siteIdentity }
           </div>
 
           <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {SCHOOL_FACILITIES.map((fac) => (
-              <div
-                key={fac.name}
-                className="rounded-xl border border-slate-200 bg-white p-6"
-              >
-                <p className="font-mono text-xs font-semibold text-blue-700">{fac.unit}</p>
-                <h3 className="mt-1.5 font-display text-base font-bold text-slate-950">
-                  {fac.name}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  {fac.description}
-                </p>
-              </div>
-            ))}
+            {SCHOOL_FACILITIES.map((fac) => {
+              const imgUrl = fac.image ? resolveAssetUrl(fac.image) : '';
+              return (
+                <article
+                  key={fac.name}
+                  className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white"
+                >
+                  {imgUrl && (
+                    <div className="aspect-video w-full overflow-hidden border-b border-slate-200 bg-slate-100">
+                      <img
+                        src={imgUrl}
+                        alt={fac.name}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="p-5 sm:p-6">
+                    <p className="font-mono text-xs font-semibold text-blue-700">{fac.unit}</p>
+                    <h3 className="mt-1.5 font-display text-base font-bold text-slate-950">
+                      {fac.name}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                      {fac.description}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -206,12 +254,40 @@ export const ProfileFullView: React.FC<ProfileFullViewProps> = ({ siteIdentity }
                 <Award className="h-4 w-4" />
                 Pengembangan Bakat Siswa
               </div>
-              <h2 className="mt-2 font-display text-2xl font-bold text-slate-950">
-                Kegiatan Ekstrakurikuler
-              </h2>
+              <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <h2 className="font-display text-2xl font-bold text-slate-950">
+                  Kegiatan Ekstrakurikuler
+                </h2>
+                <div
+                  role="tablist"
+                  aria-label="Filter Ekstrakurikuler"
+                  className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1"
+                >
+                  {[
+                    { id: 'semua' as const, label: 'Semua' },
+                    { id: 'kepemimpinan' as const, label: 'Kepemimpinan' },
+                    { id: 'keahlian' as const, label: 'Teknologi & Prestasi' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={ekskulFilter === tab.id}
+                      onClick={() => setEkskulFilter(tab.id)}
+                      className={`cursor-pointer whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                        ekskulFilter === tab.id
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                {EXTRACURRICULARS.map((ekskul) => (
+                {filteredExtracurriculars.map((ekskul) => (
                   <div
                     key={ekskul.name}
                     className="rounded-xl border border-slate-200 bg-white p-4"

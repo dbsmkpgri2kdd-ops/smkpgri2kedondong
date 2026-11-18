@@ -80,6 +80,26 @@ export interface PublicPpdbInput {
   whatsapp: string;
 }
 
+export interface PublicAlumniTracerInput {
+  fullName: string;
+  graduationYear: string;
+  programCode: 'TKR' | 'TSM' | 'TKJ' | 'TAV' | 'BD';
+  activityStatus:
+    | 'Bekerja di Industri'
+    | 'Wirausaha Mandiri'
+    | 'Melanjutkan Kuliah'
+    | 'Mencari Pekerjaan';
+  institution: string;
+  whatsapp?: string;
+}
+
+export interface PublicContactInput {
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+}
+
 const DEFAULT_IDENTITY: PublicSiteIdentity = {
   name: SCHOOL_IDENTITY.name,
   officialName: SCHOOL_IDENTITY.officialName,
@@ -228,6 +248,7 @@ export function usePortalData() {
               category: n.category,
               title: n.title,
               summary: n.summary,
+              image: resolveAssetUrl(n.imageUrl) || HERO_MEDIA.campus,
             }))
           );
         },
@@ -404,6 +425,65 @@ export function usePortalData() {
     [trackPublicEvent]
   );
 
+  const submitPublicTracer = useCallback(
+    async (input: PublicAlumniTracerInput): Promise<void> => {
+      const tracerId = generateSafeDocId('trc');
+      const path = `alumni_tracer/${tracerId}`;
+      const validCodes = ['TKR', 'TSM', 'TKJ', 'TAV', 'BD'] as const;
+      const safeCode = validCodes.includes(input.programCode) ? input.programCode : 'TKJ';
+      const cleanYear = /^20[0-3][0-9]$/.test(input.graduationYear.trim())
+        ? input.graduationYear.trim()
+        : String(new Date().getFullYear());
+
+      try {
+        await setDoc(doc(db, 'alumni_tracer', tracerId), {
+          fullName: input.fullName.trim().slice(0, 140),
+          graduationYear: cleanYear,
+          programCode: safeCode,
+          activityStatus: input.activityStatus,
+          institution: input.institution.trim().slice(0, 160),
+          whatsapp: (input.whatsapp || '').trim().slice(0, 24),
+          status: 'menunggu',
+          notes: 'Pengisian mandiri Tracer Alumni via Portal Layanan PRIDA.',
+          ownerId: 'public_visitor',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, path);
+      }
+
+      await trackPublicEvent('layanan', 'tracer_submit');
+    },
+    [trackPublicEvent]
+  );
+
+  const submitPublicContact = useCallback(
+    async (input: PublicContactInput): Promise<void> => {
+      const msgId = generateSafeDocId('msg');
+      const path = `contact_messages/${msgId}`;
+
+      try {
+        await setDoc(doc(db, 'contact_messages', msgId), {
+          senderName: input.senderName.trim().slice(0, 120),
+          senderEmail: input.senderEmail.trim().slice(0, 160),
+          subject: input.subject.trim().slice(0, 140),
+          message: input.message.trim().slice(0, 1500),
+          status: 'baru',
+          replyNote: '',
+          ownerId: 'public_visitor',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, path);
+      }
+
+      await trackPublicEvent('kontak', 'contact_submit');
+    },
+    [trackPublicEvent]
+  );
+
   return {
     siteIdentity,
     programs,
@@ -413,6 +493,8 @@ export function usePortalData() {
     academicEvents,
     faqs,
     submitPublicPpdb,
+    submitPublicTracer,
+    submitPublicContact,
     trackPublicEvent,
   };
 }

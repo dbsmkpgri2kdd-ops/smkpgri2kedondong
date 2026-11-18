@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { User } from 'firebase/auth';
-import { Activity, ArrowUpRight, Radio, Users, FileText, GraduationCap } from 'lucide-react';
+import { Activity, ArrowUpRight, Download, Radio, Users, FileText, GraduationCap } from 'lucide-react';
 import {
+  AlumniTracer,
   AnalyticsDaily,
   AnalyticsEvent,
   AuditLog,
+  ContactMessage,
   EditorialArticle,
   NewsItem,
   PpdbRegistration,
@@ -23,6 +25,8 @@ interface AnalyticsDashboardProps {
   articles: EditorialArticle[];
   ptkMembers: PtkMember[];
   ppdbList: PpdbRegistration[];
+  alumniList?: AlumniTracer[];
+  contactMessages?: ContactMessage[];
   onSeedData: () => Promise<void>;
   seeding: boolean;
   onNotify: (msg: string) => void;
@@ -44,6 +48,8 @@ const ACTION_LABELS: Record<AnalyticsEvent['actionType'], string> = {
   ppdb_submit: 'Interaksi PPDB',
   ukk_lookup: 'Cek Kelulusan UKK',
   article_read: 'Baca Artikel Vokasi',
+  tracer_submit: 'Tracer Alumni BKK',
+  contact_submit: 'Pesan Kontak Publik',
 };
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
@@ -56,6 +62,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   articles,
   ptkMembers,
   ppdbList,
+  alumniList = [],
+  contactMessages = [],
   onSeedData,
   seeding,
   onNotify,
@@ -317,7 +325,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             {totalPublishedContent.toLocaleString('id-ID')}
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            {programs.length} jurusan · {news.length} berita · {articles.length} artikel
+            {programs.length} jurusan · {news.length} berita · {articles.length} artikel · {alumniList.length} alumni · {contactMessages.length} pesan
           </div>
         </div>
       </div>
@@ -523,13 +531,44 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       {/* Live Events Stream & Audit Logs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Aliran Kunjungan Real-Time
             </h3>
-            <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-              {liveEvents.length} terbaru
-            </span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                {liveEvents.length} terbaru
+              </span>
+              {liveEvents.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const headers = ['Waktu', 'Aksi', 'Rute', 'Perangkat', 'Sumber'];
+                    const rows = liveEvents.map((ev) => [
+                      ev.createdAt?.toDate ? ev.createdAt.toDate().toISOString() : '',
+                      ACTION_LABELS[ev.actionType] || ev.actionType,
+                      ROUTE_LABELS[ev.route] || ev.route,
+                      ev.device,
+                      ev.referrer,
+                    ]);
+                    const csv = [headers, ...rows]
+                      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+                      .join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'analitik-live-prida.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <Download className="w-3 h-3" />
+                  CSV
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-72 overflow-y-auto">
             {liveEvents.slice(0, 10).map((ev) => (
@@ -561,13 +600,44 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Jejak Audit Aktivitas Admin
             </h3>
-            <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-              {auditLogs.length} log
-            </span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                {auditLogs.length} log
+              </span>
+              {auditLogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const headers = ['Waktu', 'Admin', 'Aksi', 'Koleksi', 'Target'];
+                    const rows = auditLogs.map((log) => [
+                      log.createdAt?.toDate ? log.createdAt.toDate().toISOString() : '',
+                      log.actorName,
+                      log.action,
+                      log.collectionName,
+                      log.targetTitle,
+                    ]);
+                    const csv = [headers, ...rows]
+                      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+                      .join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'audit-admin-prida.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-slate-700 px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <Download className="w-3 h-3" />
+                  CSV
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-72 overflow-y-auto">
             {auditLogs.slice(0, 10).map((log) => (

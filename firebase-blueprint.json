@@ -256,7 +256,7 @@
       "type": "object",
       "properties": {
         "route": { "type": "string", "enum": ["beranda", "profil", "jurusan", "ppdb", "layanan", "literasi", "media", "kontak"] },
-        "actionType": { "type": "string", "enum": ["pageview", "ppdb_submit", "ukk_lookup", "article_read"] },
+        "actionType": { "type": "string", "enum": ["pageview", "ppdb_submit", "ukk_lookup", "article_read", "tracer_submit", "contact_submit"] },
         "device": { "type": "string", "enum": ["Desktop", "Mobile", "Tablet"] },
         "referrer": { "type": "string", "maxLength": 120 },
         "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
@@ -278,6 +278,42 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["actorUid", "actorName", "action", "collectionName", "targetTitle", "ownerId", "createdAt"]
+    },
+    "AlumniTracer": {
+      "title": "AlumniTracer",
+      "description": "Catatan penelusuran lulusan & Bursa Kerja Khusus (BKK) SMK PGRI 2 Kedondong",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "graduationYear": { "type": "string", "minLength": 4, "maxLength": 4, "pattern": "^20[0-3][0-9]$" },
+        "programCode": { "type": "string", "enum": ["TKR", "TSM", "TKJ", "TAV", "BD"] },
+        "activityStatus": { "type": "string", "enum": ["Bekerja di Industri", "Wirausaha Mandiri", "Melanjutkan Kuliah", "Mencari Pekerjaan"] },
+        "institution": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "whatsapp": { "type": "string", "maxLength": 24 },
+        "status": { "type": "string", "enum": ["menunggu", "terverifikasi"] },
+        "notes": { "type": "string", "maxLength": 400 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "graduationYear", "programCode", "activityStatus", "institution", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Pesan kontak dan pertanyaan publik yang dikirim ke pengelola sekolah",
+      "type": "object",
+      "properties": {
+        "senderName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "senderEmail": { "type": "string", "minLength": 5, "maxLength": 160 },
+        "subject": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "message": { "type": "string", "minLength": 10, "maxLength": 1500 },
+        "status": { "type": "string", "enum": ["baru", "ditindaklanjuti", "selesai"] },
+        "replyNote": { "type": "string", "maxLength": 500 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderName", "senderEmail", "subject", "message", "status", "ownerId", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -332,6 +368,14 @@
     "/audit_logs/{logId}": {
       "schema": { "$ref": "#/entities/AuditLog" },
       "description": "Log aktivitas perubahan data oleh admin"
+    },
+    "/alumni_tracer/{tracerId}": {
+      "schema": { "$ref": "#/entities/AlumniTracer" },
+      "description": "Data penelusuran alumni & Bursa Kerja Khusus (BKK)"
+    },
+    "/contact_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ContactMessage" },
+      "description": "Kotak masuk pesan dan pertanyaan masyarakat ke sekolah"
     }
   }
 }

@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle2,
+  Download,
   ExternalLink,
   FileText,
   GraduationCap,
@@ -25,6 +26,7 @@ import {
   isExternalBlockedForIframe,
   lookupUkkResult,
 } from '../services/schoolApi';
+import { PublicAlumniTracerInput } from '../services/usePortalData';
 import {
   AcademicEvent,
   DynamicPortalItem,
@@ -44,6 +46,7 @@ interface ServicesSectionProps {
   academicEvents?: AcademicEvent[];
   programs?: StudyProgram[];
   onTrackUkk?: () => void;
+  onSubmitTracer?: (data: PublicAlumniTracerInput) => Promise<void>;
 }
 
 export type ServiceTab = 'ukk' | 'ptk' | 'tracer' | 'kalender' | 'portal';
@@ -73,6 +76,24 @@ function launchCelebrationConfetti() {
   }
 }
 
+function triggerFileDownload(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function formatIcsDate(year: number, monthIndex: number, day: number): string {
+  const mm = String(monthIndex + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}${mm}${dd}`;
+}
+
 export const ServicesSection: React.FC<ServicesSectionProps> = ({
   portalItems,
   portalLoading,
@@ -83,8 +104,8 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
   academicEvents = ACADEMIC_CALENDAR,
   programs = STUDY_PROGRAMS,
   onTrackUkk,
+  onSubmitTracer,
 }) => {
-
   // UKK Lookup state
   const [namaSiswa, setNamaSiswa] = useState('');
   const [kelasSiswa, setKelasSiswa] = useState('');
@@ -103,10 +124,17 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
   // Tracer Alumni state
   const [alumniName, setAlumniName] = useState('');
   const [alumniYear, setAlumniYear] = useState('2025');
-  const [alumniMajor, setAlumniMajor] = useState(programs[0]?.code || STUDY_PROGRAMS[0].code);
-  const [alumniStatus, setAlumniStatus] = useState('Bekerja di Industri');
+  const [alumniMajor, setAlumniMajor] = useState<PublicAlumniTracerInput['programCode']>(
+    (programs[0]?.code as PublicAlumniTracerInput['programCode']) || 'TKJ'
+  );
+  const [alumniStatus, setAlumniStatus] =
+    useState<PublicAlumniTracerInput['activityStatus']>('Bekerja di Industri');
   const [alumniCompany, setAlumniCompany] = useState('');
-  const [tracerFeedback, setTracerFeedback] = useState<string | null>(null);
+  const [alumniWhatsapp, setAlumniWhatsapp] = useState('');
+  const [tracerSubmitting, setTracerSubmitting] = useState(false);
+  const [tracerNotice, setTracerNotice] = useState<{ type: 'ok' | 'err'; text: string } | null>(
+    null
+  );
 
   // Portal Auth state (preserving original PRIDA auth behavior without window.alert)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
@@ -176,32 +204,148 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
     }
   };
 
-  const handleTracerSubmit = (e: React.FormEvent) => {
+  const handleTracerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!alumniName.trim() || !alumniCompany.trim()) {
-      setTracerFeedback('Mohon lengkapi nama lengkap serta instansi/tempat usaha saat ini.');
+      setTracerNotice({
+        type: 'err',
+        text: 'Mohon lengkapi nama lengkap serta instansi/tempat usaha saat ini.',
+      });
       return;
     }
+    setTracerSubmitting(true);
+    setTracerNotice(null);
+
     try {
-      const parsed = JSON.parse(localStorage.getItem('prida_tracer_records') || '[]');
-      const existing = Array.isArray(parsed) ? parsed : [];
-      existing.push({
-        nama: alumniName.trim(),
-        tahun: alumniYear,
-        jurusan: alumniMajor,
-        status: alumniStatus,
-        instansi: alumniCompany.trim(),
-        submittedAt: new Date().toISOString(),
+      if (onSubmitTracer) {
+        await onSubmitTracer({
+          fullName: alumniName.trim(),
+          graduationYear: alumniYear.trim(),
+          programCode: alumniMajor,
+          activityStatus: alumniStatus,
+          institution: alumniCompany.trim(),
+          whatsapp: alumniWhatsapp.trim(),
+        });
+      }
+
+      try {
+        const parsed = JSON.parse(localStorage.getItem('prida_tracer_records') || '[]');
+        const existing = Array.isArray(parsed) ? parsed : [];
+        existing.push({
+          nama: alumniName.trim(),
+          tahun: alumniYear.trim(),
+          jurusan: alumniMajor,
+          status: alumniStatus,
+          instansi: alumniCompany.trim(),
+          whatsapp: alumniWhatsapp.trim(),
+          submittedAt: new Date().toISOString(),
+        });
+        localStorage.setItem('prida_tracer_records', JSON.stringify(existing));
+      } catch {
+        // Ignore storage restriction or malformed cache
+      }
+
+      setTracerNotice({
+        type: 'ok',
+        text: `Terima kasih, data penelusuran alumni atas nama ${alumniName.trim()} (${alumniMajor} ${alumniYear}) berhasil dikirim ke BKK SMK PGRI 2 Kedondong.`,
       });
-      localStorage.setItem('prida_tracer_records', JSON.stringify(existing));
+      setAlumniName('');
+      setAlumniCompany('');
+      setAlumniWhatsapp('');
     } catch {
-      // Ignore storage restriction or malformed cache
+      setTracerNotice({
+        type: 'err',
+        text: 'Terjadi kendala saat mengirim data alumni. Periksa koneksi internet Anda lalu coba kembali.',
+      });
+    } finally {
+      setTracerSubmitting(false);
     }
-    setTracerFeedback(
-      `Terima kasih, data penelusuran alumni atas nama ${alumniName.trim()} (${alumniMajor} ${alumniYear}) berhasil dicatat.`
+  };
+
+  const handleDownloadCalendarIcs = () => {
+    const baseYear = new Date().getFullYear();
+    const dtStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const monthHints: Array<[RegExp, number, number]> = [
+      [/juli/i, 6, 14],
+      [/oktober/i, 9, 1],
+      [/november|desember/i, 11, 2],
+      [/januari|maret/i, 0, 12],
+      [/februari|april/i, 1, 16],
+      [/mei|juni/i, 4, 18],
+    ];
+
+    const vevents = academicEvents
+      .map((ev, index) => {
+        const matched = monthHints.find(([rx]) => rx.test(ev.period));
+        const monthIndex = matched ? matched[1] : (index * 2) % 12;
+        const day = matched ? matched[2] : 10;
+        const evYear = monthIndex < 6 ? baseYear + 1 : baseYear;
+        const dtStart = formatIcsDate(evYear, monthIndex, day);
+        const dtEnd = formatIcsDate(evYear, monthIndex, day + 3);
+        const cleanTitle = ev.title.replace(/[\r\n,;]/g, ' ');
+        const cleanDesc = `${ev.period} — ${ev.description}`.replace(/[\r\n]/g, ' ');
+        return [
+          'BEGIN:VEVENT',
+          `UID:prida-kdd-${evYear}-${index + 1}@smkpgri2kedondong.sch.id`,
+          `DTSTAMP:${dtStamp}`,
+          `DTSTART;VALUE=DATE:${dtStart}`,
+          `DTEND;VALUE=DATE:${dtEnd}`,
+          `SUMMARY:${cleanTitle} (SMK PGRI 2 Kedondong)`,
+          `DESCRIPTION:${cleanDesc}`,
+          'LOCATION:SMK PGRI 2 Kedondong, Jl. Tritura Kedondong, Pesawaran',
+          'END:VEVENT',
+        ].join('\r\n');
+      })
+      .join('\r\n');
+
+    const icsPayload = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//SMK PGRI 2 Kedondong//Portal PRIDA//ID',
+      'CALSCALE:GREGORIAN',
+      'X-WR-CALNAME:Kalender Akademik SMK PGRI 2 Kedondong',
+      vevents,
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    triggerFileDownload(
+      'kalender-akademik-smk-pgri-2-kedondong.ics',
+      icsPayload,
+      'text/calendar;charset=utf-8'
     );
-    setAlumniName('');
-    setAlumniCompany('');
+  };
+
+  const handleDownloadGuideDoc = (doc: { title: string; category: string; format: string }) => {
+    const safeSlug = doc.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    const content = [
+      '================================================================',
+      'SMK PGRI 2 KEDONDONG — PORTAL RESMI PRIDA (NPSN: 10811003)',
+      'Jl. Tritura Kedondong, RT 1 / RW 1, Kab. Pesawaran, Lampung 35381',
+      'Website: https://smkpgri2kedondong.sch.id | Email: dbsmkpgri2kdd@gmail.com',
+      '================================================================',
+      '',
+      `Judul Dokumen : ${doc.title}`,
+      `Kategori      : ${doc.category}`,
+      `Referensi     : ${doc.format}`,
+      `Diunduh pada  : ${new Date().toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}`,
+      '',
+      'Ringkasan Pedoman Operasional:',
+      '1. Seluruh kegiatan pembelajaran dan praktik bengkel mengikuti standar K3 sekolah.',
+      '2. Layanan administrasi tata usaha buka Senin - Sabtu pukul 07.15 - 14.30 WIB.',
+      '3. Informasi pembaruan berkala dipublikasikan melalui portal smkpgri2kedondong.sch.id.',
+      '',
+      'Untuk verifikasi dokumen bertanda tangan basah / cap resmi sekolah,',
+      'silakan hubungi Ruang Tata Usaha SMK PGRI 2 Kedondong.',
+    ].join('\n');
+
+    triggerFileDownload(`${safeSlug}.txt`, content, 'text/plain;charset=utf-8');
   };
 
   const handlePortalLogin = (e: React.FormEvent) => {
@@ -755,7 +899,11 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                     <select
                       id="alumni-jurusan"
                       value={alumniMajor}
-                      onChange={(e) => setAlumniMajor(e.target.value)}
+                      onChange={(e) =>
+                        setAlumniMajor(
+                          e.target.value as PublicAlumniTracerInput['programCode']
+                        )
+                      }
                       className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-blue-700 focus:outline-none"
                     >
                       {programs.map((p) => (
@@ -775,7 +923,11 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                     <select
                       id="alumni-status"
                       value={alumniStatus}
-                      onChange={(e) => setAlumniStatus(e.target.value)}
+                      onChange={(e) =>
+                        setAlumniStatus(
+                          e.target.value as PublicAlumniTracerInput['activityStatus']
+                        )
+                      }
                       className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-blue-700 focus:outline-none"
                     >
                       <option value="Bekerja di Industri">Bekerja di Industri / Perusahaan</option>
@@ -786,34 +938,60 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="alumni-instansi"
-                    className="block text-xs font-semibold text-slate-700"
-                  >
-                    Nama Perusahaan / Kampus / Bidang Usaha
-                  </label>
-                  <input
-                    id="alumni-instansi"
-                    type="text"
-                    value={alumniCompany}
-                    onChange={(e) => setAlumniCompany(e.target.value)}
-                    placeholder="Contoh: PT Astra Honda Motor / Universitas Lampung"
-                    className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-blue-700 focus:outline-none"
-                  />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="alumni-instansi"
+                      className="block text-xs font-semibold text-slate-700"
+                    >
+                      Nama Perusahaan / Kampus / Usaha
+                    </label>
+                    <input
+                      id="alumni-instansi"
+                      type="text"
+                      value={alumniCompany}
+                      onChange={(e) => setAlumniCompany(e.target.value)}
+                      placeholder="Contoh: PT Astra Honda Motor / Unila"
+                      className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm focus:border-blue-700 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="alumni-wa"
+                      className="block text-xs font-semibold text-slate-700"
+                    >
+                      Nomor WhatsApp BKK (Opsional)
+                    </label>
+                    <input
+                      id="alumni-wa"
+                      type="tel"
+                      value={alumniWhatsapp}
+                      onChange={(e) => setAlumniWhatsapp(e.target.value)}
+                      placeholder="0812xxxxxxxx"
+                      className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 font-mono text-sm focus:border-blue-700 focus:outline-none"
+                    />
+                  </div>
                 </div>
 
-                {tracerFeedback && (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-                    {tracerFeedback}
+                {tracerNotice && (
+                  <div
+                    role="status"
+                    className={`rounded-lg border p-3 text-xs ${
+                      tracerNotice.type === 'ok'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                        : 'border-red-200 bg-red-50 text-red-900'
+                    }`}
+                  >
+                    {tracerNotice.text}
                   </div>
                 )}
 
                 <button
                   type="submit"
-                  className="inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                  disabled={tracerSubmitting}
+                  className="inline-flex min-h-[44px] cursor-pointer items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Kirim Pembaruan Data Alumni
+                  {tracerSubmitting ? 'Mengirim Data Alumni...' : 'Kirim Pembaruan Data Alumni'}
                 </button>
               </form>
             </div>
@@ -822,13 +1000,25 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
           {activeTab === 'kalender' && (
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
               <div className="lg:col-span-7">
-                <h3 className="font-display text-xl font-bold text-slate-950">
-                  Kalender Akademik &amp; Agenda Kegiatan Sekolah
-                </h3>
-                <p className="mt-1 text-sm text-slate-600">
-                  Jadwal pelaksanaan MPLS, penilaian semester, Praktik Kerja Lapangan (PKL), dan
-                  Uji Kompetensi Keahlian (UKK).
-                </p>
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div>
+                    <h3 className="font-display text-xl font-bold text-slate-950">
+                      Kalender Akademik &amp; Agenda Kegiatan Sekolah
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Jadwal pelaksanaan MPLS, penilaian semester, Praktik Kerja Lapangan (PKL),
+                      dan Uji Kompetensi Keahlian (UKK).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCalendarIcs}
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+                  >
+                    <Download className="h-3.5 w-3.5 text-blue-700" />
+                    Unduh Kalender (.ics)
+                  </button>
+                </div>
 
                 <div className="mt-5 divide-y divide-slate-200 rounded-xl border border-slate-200">
                   {academicEvents.map((event) => (
@@ -858,17 +1048,28 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                   {SCHOOL_DOCUMENTS.map((doc) => (
                     <div
                       key={doc.title}
-                      className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
+                      className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"
                     >
-                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
-                      <div>
-                        <p className="text-xs font-medium text-blue-700">
-                          {doc.category} · {doc.format}
-                        </p>
-                        <p className="mt-0.5 font-display text-sm font-bold text-slate-950">
-                          {doc.title}
-                        </p>
+                      <div className="flex min-w-0 items-start gap-3">
+                        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-blue-700">
+                            {doc.category} · {doc.format}
+                          </p>
+                          <p className="mt-0.5 font-display text-sm font-bold text-slate-950">
+                            {doc.title}
+                          </p>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadGuideDoc(doc)}
+                        aria-label={`Unduh ringkasan ${doc.title}`}
+                        className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-blue-300 hover:text-blue-700"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Unduh
+                      </button>
                     </div>
                   ))}
                 </div>

@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type AdminTab = 'analytics' | 'content' | 'users' | 'ppdb';
+export type AdminTab = 'analytics' | 'content' | 'ppdb' | 'inbox' | 'users';
 export type ContentSubTab = 'news' | 'programs' | 'articles' | 'ptk' | 'calendar_faq' | 'settings';
 
 export type UserRole = 'super_admin' | 'admin' | 'editor' | 'operator_ppdb' | 'viewer';
@@ -139,6 +139,38 @@ export interface PpdbRegistration {
   updatedAt?: Timestamp;
 }
 
+export interface AlumniTracer {
+  id: string;
+  fullName: string;
+  graduationYear: string;
+  programCode: 'TKR' | 'TSM' | 'TKJ' | 'TAV' | 'BD';
+  activityStatus:
+    | 'Bekerja di Industri'
+    | 'Wirausaha Mandiri'
+    | 'Melanjutkan Kuliah'
+    | 'Mencari Pekerjaan';
+  institution: string;
+  whatsapp?: string;
+  status: 'menunggu' | 'terverifikasi';
+  notes?: string;
+  ownerId: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface ContactMessage {
+  id: string;
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+  status: 'baru' | 'ditindaklanjuti' | 'selesai';
+  replyNote?: string;
+  ownerId: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface AnalyticsDaily {
   id: string;
   dateKey: string;
@@ -154,7 +186,13 @@ export interface AnalyticsDaily {
 export interface AnalyticsEvent {
   id: string;
   route: 'beranda' | 'profil' | 'jurusan' | 'ppdb' | 'layanan' | 'literasi' | 'media' | 'kontak';
-  actionType: 'pageview' | 'ppdb_submit' | 'ukk_lookup' | 'article_read';
+  actionType:
+    | 'pageview'
+    | 'ppdb_submit'
+    | 'ukk_lookup'
+    | 'article_read'
+    | 'tracer_submit'
+    | 'contact_submit';
   device: 'Desktop' | 'Mobile' | 'Tablet';
   referrer: string;
   ownerId: string;

@@ -1,32 +1,44 @@
-import React, { useState } from 'react';
-import { ChevronDown, Mail, MapPin, Send } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, Mail, MapPin, Search, Send } from 'lucide-react';
 import { FAQ_ITEMS, SCHOOL_IDENTITY } from '../data/schoolData';
-import { PublicSiteIdentity } from '../services/usePortalData';
+import { PublicContactInput, PublicSiteIdentity } from '../services/usePortalData';
 import { FaqEntry } from '../types/portal';
 
 interface ContactFaqSectionProps {
   faqs?: FaqEntry[];
   siteIdentity?: PublicSiteIdentity;
+  onSubmitContact?: (data: PublicContactInput) => Promise<void>;
 }
 
 export const ContactFaqSection: React.FC<ContactFaqSectionProps> = ({
   faqs = FAQ_ITEMS,
   siteIdentity,
+  onSubmitContact,
 }) => {
   const email = siteIdentity?.email || SCHOOL_IDENTITY.email;
   const address = siteIdentity?.address || SCHOOL_IDENTITY.address;
   const schoolName = siteIdentity?.name || SCHOOL_IDENTITY.name;
 
+  const [faqQuery, setFaqQuery] = useState('');
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [senderName, setSenderName] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [subject, setSubject] = useState('Informasi PPDB & Program Keahlian');
   const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [formNotice, setFormNotice] = useState<{ type: 'ok' | 'err'; text: string } | null>(
     null
   );
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const filteredFaqs = useMemo(() => {
+    const q = faqQuery.trim().toLowerCase();
+    if (!q) return faqs;
+    return faqs.filter(
+      (f) => f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q)
+    );
+  }, [faqs, faqQuery]);
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(senderEmail.trim());
     if (!senderName.trim() || !emailValid || message.trim().length < 10) {
@@ -37,13 +49,33 @@ export const ContactFaqSection: React.FC<ContactFaqSectionProps> = ({
       return;
     }
 
-    setFormNotice({
-      type: 'ok',
-      text: `Terima kasih, ${senderName.trim()}. Pesan Anda telah tercatat untuk diteruskan ke tata usaha ${schoolName} (${email}).`,
-    });
-    setSenderName('');
-    setSenderEmail('');
-    setMessage('');
+    setSubmitting(true);
+    setFormNotice(null);
+    try {
+      if (onSubmitContact) {
+        await onSubmitContact({
+          senderName: senderName.trim(),
+          senderEmail: senderEmail.trim(),
+          subject,
+          message: message.trim(),
+        });
+      }
+
+      setFormNotice({
+        type: 'ok',
+        text: `Terima kasih, ${senderName.trim()}. Pesan Anda telah diterima di Kotak Masuk Tata Usaha ${schoolName} (${email}).`,
+      });
+      setSenderName('');
+      setSenderEmail('');
+      setMessage('');
+    } catch {
+      setFormNotice({
+        type: 'err',
+        text: `Gagal mengirim pesan ke server sekolah. Silakan ulangi atau kirim email langsung ke ${email}.`,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -66,34 +98,56 @@ export const ContactFaqSection: React.FC<ContactFaqSectionProps> = ({
               Informasi Seputar Layanan &amp; Sekolah
             </h2>
 
-            <div className="mt-6 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
-              {faqs.map((item, idx) => {
-                const isOpen = openFaqIndex === idx;
-                return (
-                  <div key={item.question} className="p-5">
-                    <button
-                      type="button"
-                      aria-expanded={isOpen}
-                      onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                      className="flex w-full cursor-pointer items-center justify-between gap-4 text-left"
-                    >
-                      <span className="font-display text-sm font-bold text-slate-950 sm:text-base">
-                        {item.question}
-                      </span>
-                      <ChevronDown
-                        className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-150 ${
-                          isOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </button>
-                    {isOpen && (
-                      <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                        {item.answer}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="relative mt-5">
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={faqQuery}
+                onChange={(e) => {
+                  setFaqQuery(e.target.value);
+                  setOpenFaqIndex(0);
+                }}
+                placeholder="Cari topik pertanyaan (PPDB, UKK, PKL, biaya)..."
+                aria-label="Cari pertanyaan FAQ"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pr-4 pl-10 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-700 focus:outline-none"
+              />
+            </div>
+
+            <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+              {filteredFaqs.length === 0 ? (
+                <div className="p-6 text-center text-sm text-slate-500">
+                  Tidak ada topik FAQ yang cocok dengan kata kunci Anda. Silakan ajukan pertanyaan
+                  langsung melalui formulir di samping.
+                </div>
+              ) : (
+                filteredFaqs.map((item, idx) => {
+                  const isOpen = openFaqIndex === idx;
+                  return (
+                    <div key={item.question} className="p-5">
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="flex w-full cursor-pointer items-center justify-between gap-4 text-left"
+                      >
+                        <span className="font-display text-sm font-bold text-slate-950 sm:text-base">
+                          {item.question}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-150 ${
+                            isOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                      {isOpen && (
+                        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                          {item.answer}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -215,10 +269,11 @@ export const ContactFaqSection: React.FC<ContactFaqSectionProps> = ({
 
                 <button
                   type="submit"
-                  className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
+                  disabled={submitting}
+                  className="inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Send className="h-4 w-4" />
-                  Kirim Pesan ke Sekolah
+                  {submitting ? 'Mengirim Pesan...' : 'Kirim Pesan ke Sekolah'}
                 </button>
               </form>
             </div>

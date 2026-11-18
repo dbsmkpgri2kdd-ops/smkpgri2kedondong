@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CheckCircle2, ClipboardCheck, FileText, Printer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2, ClipboardCheck, FileText, History, Printer } from 'lucide-react';
 import { SCHOOL_IDENTITY, STUDY_PROGRAMS } from '../data/schoolData';
 import { PublicPpdbInput, PublicSiteIdentity } from '../services/usePortalData';
 import { StudyProgram } from '../types/portal';
@@ -19,6 +19,7 @@ interface PpdbViewProps {
   programs?: StudyProgram[];
   siteIdentity?: PublicSiteIdentity;
   onSubmitPpdb?: (data: PublicPpdbInput) => Promise<void>;
+  preselectedProgram?: string;
 }
 
 const REGISTRATION_STEPS = [
@@ -56,6 +57,7 @@ export const PpdbView: React.FC<PpdbViewProps> = ({
   programs = STUDY_PROGRAMS,
   siteIdentity,
   onSubmitPpdb,
+  preselectedProgram,
 }) => {
   const activePrograms = programs.length > 0 ? programs : STUDY_PROGRAMS;
   const ppdbOpen = siteIdentity?.ppdbOpen ?? true;
@@ -66,12 +68,28 @@ export const PpdbView: React.FC<PpdbViewProps> = ({
   const [fullName, setFullName] = useState('');
   const [nisn, setNisn] = useState('');
   const [originSchool, setOriginSchool] = useState('');
-  const [choice1, setChoice1] = useState(activePrograms[0]?.code || 'TKR');
+  const [choice1, setChoice1] = useState(
+    preselectedProgram || activePrograms[0]?.code || 'TKR'
+  );
   const [choice2, setChoice2] = useState(activePrograms[2]?.code || activePrograms[0]?.code || 'TKJ');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<RegistrationReceipt | null>(null);
+  const [savedReceipts, setSavedReceipts] = useState<RegistrationReceipt[]>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('prida_ppdb_records') || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (preselectedProgram) {
+      setChoice1(preselectedProgram);
+    }
+  }, [preselectedProgram]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,8 +144,10 @@ export const PpdbView: React.FC<PpdbViewProps> = ({
       try {
         const parsed = JSON.parse(localStorage.getItem('prida_ppdb_records') || '[]');
         const saved = Array.isArray(parsed) ? parsed : [];
-        saved.push(record);
-        localStorage.setItem('prida_ppdb_records', JSON.stringify(saved));
+        saved.unshift(record);
+        const trimmed = saved.slice(0, 10);
+        localStorage.setItem('prida_ppdb_records', JSON.stringify(trimmed));
+        setSavedReceipts(trimmed);
       } catch {
         // Ignore storage restrictions or malformed local cache
       }
@@ -215,6 +235,37 @@ export const PpdbView: React.FC<PpdbViewProps> = ({
                   Jam Layanan: {hours}
                 </p>
               </div>
+
+              {savedReceipts.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                  <div className="flex items-center gap-2 font-display text-sm font-bold text-slate-950">
+                    <History className="h-4 w-4 text-blue-700" />
+                    Riwayat Bukti di Perangkat Ini
+                  </div>
+                  <div className="mt-3 divide-y divide-slate-100">
+                    {savedReceipts.slice(0, 4).map((item) => (
+                      <div
+                        key={item.regCode}
+                        className="flex items-center justify-between gap-3 py-2.5 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-900">{item.fullName}</p>
+                          <p className="font-mono text-slate-500">
+                            {item.regCode} · {item.choice1}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setReceipt(item)}
+                          className="shrink-0 cursor-pointer rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 font-semibold text-blue-700 hover:bg-blue-50"
+                        >
+                          Lihat Bukti
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Interactive Registration Form */}

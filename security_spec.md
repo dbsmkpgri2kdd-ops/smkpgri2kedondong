@@ -1,10 +1,10 @@
 # Security Specification — Panel Admin PRIDA (SMK PGRI 2 Kedondong)
 
 ## 1. Data Invariants
-1. **Identitas & Kepemilikan**: Setiap dokumen pada koleksi konten (`news`, `programs`, `articles`, `ptk_members`, `academic_events`, `faqs`, `ppdb_registrations`, `site_settings`, `analytics_daily`, `analytics_events`, `audit_logs`) wajib memiliki `ownerId` yang valid (`^[a-zA-Z0-9_\-]+$`) dan sama dengan `request.auth.uid` saat pembuatan, serta tidak dapat diubah (`immutable`) saat pembaruan.
+1. **Identitas & Kepemilikan**: Setiap dokumen pada koleksi konten (`news`, `programs`, `articles`, `ptk_members`, `academic_events`, `faqs`, `ppdb_registrations`, `alumni_tracer`, `contact_messages`, `site_settings`, `analytics_daily`, `analytics_events`, `audit_logs`) wajib memiliki `ownerId` yang valid (`^[a-zA-Z0-9_\-]+$`) dan sama dengan `request.auth.uid` saat pembuatan (atau `public_visitor` dengan status awal terkunci), serta tidak dapat diubah (`immutable`) saat pembaruan.
 2. **Pencegahan Eskalasi Hak Akses (RBAC)**: Pengguna baru yang mendaftarkan profilnya sendiri di `/users/{userId}` hanya boleh mengisi `role == 'viewer'` dan `status == 'pending'`, kecuali email terverifikasi `dbsmkpgri2kdd@gmail.com`. Pengguna non-admin dilarang keras mengubah field `role`, `status`, `uid`, `email`, atau `ownerId`.
 3. **Integritas Temporal**: Semua field `createdAt` dan `updatedAt` wajib bernilai `request.time` pada saat pembuatan, `createdAt` bersifat immutable, dan `updatedAt == request.time` wajib terpenuhi pada setiap pembaruan.
-4. **Isolasi PII & Query Safety**: Koleksi yang memuat PII (`users`, `ppdb_registrations`, `audit_logs`) dilarang dibaca secara massal oleh non-admin. Aturan `allow list` tidak menggunakan `get()` maupun `exists()` (O(1) cost guard), hanya mengizinkan `isBootstrappedAdmin()` atau pemilik (`resource.data.ownerId == request.auth.uid`).
+4. **Isolasi PII & Query Safety**: Koleksi yang memuat PII (`users`, `ppdb_registrations`, `alumni_tracer`, `contact_messages`, `audit_logs`) dilarang dibaca secara massal oleh non-admin. Aturan `allow list` tidak menggunakan `get()` maupun `exists()` (O(1) cost guard), hanya mengizinkan `isBootstrappedAdmin()` atau pemilik (`resource.data.ownerId == request.auth.uid`).
 5. **Batas Volumetrik & Validasi Schema**: Setiap string wajib memiliki batas `.size()`, setiap array dibatasi maksimal 10–20 elemen dan diperiksa tipe elemen pertamanya, serta setiap ID dokumen divalidasi dengan `isValidId()`.
 
 ## 2. The "Dirty Dozen" Payloads (Adversarial Tests)

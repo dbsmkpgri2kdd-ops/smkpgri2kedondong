@@ -73,12 +73,14 @@ export interface SchoolFacility {
   name: string;
   unit: string;
   description: string;
+  image?: string;
 }
 
 export interface Extracurricular {
   name: string;
   schedule: string;
   focus: string;
+  category?: 'kepemimpinan' | 'keahlian';
 }
 
 export interface AcademicEvent {
@@ -93,4 +95,5 @@ export interface SchoolNewsItem {
   category: string;
   title: string;
   summary: string;
+  image?: string;
 }

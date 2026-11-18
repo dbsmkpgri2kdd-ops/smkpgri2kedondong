@@ -41,6 +41,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
   const [externalModal, setExternalModal] = useState<{ title: string; url: string } | null>(
     null
   );
+  const [preselectedPpdbProgram, setPreselectedPpdbProgram] = useState<string>('');
 
   const {
     siteIdentity,
@@ -51,6 +52,8 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
     academicEvents,
     faqs,
     submitPublicPpdb,
+    submitPublicTracer,
+    submitPublicContact,
     trackPublicEvent,
   } = usePortalData();
 
@@ -117,6 +120,14 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
     [handleNavigate]
   );
 
+  const handleApplyProgramFromQuiz = useCallback(
+    (programCode: string) => {
+      setPreselectedPpdbProgram(programCode);
+      handleNavigate('ppdb');
+    },
+    [handleNavigate]
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900">
       <PortalHeader
@@ -140,13 +151,16 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
 
         {activeRoute === 'profil' && <ProfileFullView siteIdentity={siteIdentity} />}
 
-        {activeRoute === 'jurusan' && <ProgramsSection programs={programs} />}
+        {activeRoute === 'jurusan' && (
+          <ProgramsSection programs={programs} onApplyProgram={handleApplyProgramFromQuiz} />
+        )}
 
         {activeRoute === 'ppdb' && (
           <PpdbView
             programs={programs}
             siteIdentity={siteIdentity}
             onSubmitPpdb={submitPublicPpdb}
+            preselectedProgram={preselectedPpdbProgram}
           />
         )}
 
@@ -161,6 +175,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
             academicEvents={academicEvents}
             programs={programs}
             onTrackUkk={() => trackPublicEvent('layanan', 'ukk_lookup')}
+            onSubmitTracer={submitPublicTracer}
           />
         )}
 
@@ -183,11 +198,16 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
             onOpenExternal={(title, url) => setExternalModal({ title, url })}
             news={news}
             siteIdentity={siteIdentity}
+            onNavigate={handleNavigate}
           />
         )}
 
         {activeRoute === 'kontak' && (
-          <ContactFaqSection faqs={faqs} siteIdentity={siteIdentity} />
+          <ContactFaqSection
+            faqs={faqs}
+            siteIdentity={siteIdentity}
+            onSubmitContact={submitPublicContact}
+          />
         )}
       </main>
 

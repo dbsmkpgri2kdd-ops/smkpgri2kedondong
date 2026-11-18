@@ -242,7 +242,7 @@ service cloud.firestore {
       return data.keys().hasAll(['route', 'actionType', 'device', 'referrer', 'ownerId', 'createdAt'])
         && data.keys().hasOnly(['route', 'actionType', 'device', 'referrer', 'ownerId', 'createdAt'])
         && data.route in ['beranda', 'profil', 'jurusan', 'ppdb', 'layanan', 'literasi', 'media', 'kontak']
-        && data.actionType in ['pageview', 'ppdb_submit', 'ukk_lookup', 'article_read']
+        && data.actionType in ['pageview', 'ppdb_submit', 'ukk_lookup', 'article_read', 'tracer_submit', 'contact_submit']
         && data.device in ['Desktop', 'Mobile', 'Tablet']
         && isStringBounded(data.referrer, 1, 120)
         && isValidId(data.ownerId)
@@ -259,6 +259,37 @@ service cloud.firestore {
         && isStringBounded(data.targetTitle, 2, 200)
         && isValidId(data.ownerId)
         && data.createdAt is timestamp;
+    }
+
+    function isValidAlumniTracer(data) {
+      return data.keys().hasAll(['fullName', 'graduationYear', 'programCode', 'activityStatus', 'institution', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['fullName', 'graduationYear', 'programCode', 'activityStatus', 'institution', 'whatsapp', 'status', 'notes', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.fullName, 2, 140)
+        && isStringBounded(data.graduationYear, 4, 4)
+        && data.graduationYear.matches('^20[0-3][0-9]$')
+        && data.programCode in ['TKR', 'TSM', 'TKJ', 'TAV', 'BD']
+        && data.activityStatus in ['Bekerja di Industri', 'Wirausaha Mandiri', 'Melanjutkan Kuliah', 'Mencari Pekerjaan']
+        && isStringBounded(data.institution, 2, 160)
+        && (!('whatsapp' in data) || isStringBounded(data.whatsapp, 0, 24))
+        && data.status in ['menunggu', 'terverifikasi']
+        && (!('notes' in data) || isStringBounded(data.notes, 0, 400))
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidContactMessage(data) {
+      return data.keys().hasAll(['senderName', 'senderEmail', 'subject', 'message', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['senderName', 'senderEmail', 'subject', 'message', 'status', 'replyNote', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.senderName, 2, 120)
+        && isStringBounded(data.senderEmail, 5, 160)
+        && isStringBounded(data.subject, 3, 140)
+        && isStringBounded(data.message, 10, 1500)
+        && data.status in ['baru', 'ditindaklanjuti', 'selesai']
+        && (!('replyNote' in data) || isStringBounded(data.replyNote, 0, 500))
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
     }
 
     // =========================================================================
@@ -469,6 +500,58 @@ service cloud.firestore {
       allow create: if isValidId(logId) && isVerified() && isValidAuditLog(incoming()) && incoming().ownerId == request.auth.uid && incoming().actorUid == request.auth.uid && incoming().createdAt == request.time;
       allow update: if false;
       allow delete: if false;
+    }
+
+    // Alumni Tracer PII: private admin/owner read & list; allows validated public_visitor submission with status == 'menunggu'
+    match /alumni_tracer/{tracerId} {
+      allow get: if isValidId(tracerId) && (isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(tracerId) && isValidAlumniTracer(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isVerified() && incoming().ownerId == request.auth.uid) ||
+          (incoming().ownerId == 'public_visitor' && incoming().status == 'menunggu')
+        );
+      allow update: if isValidId(tracerId) && isVerified() && isValidAlumniTracer(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().ownerId == request.auth.uid
+            && existing().status != 'terverifikasi'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'graduationYear', 'programCode', 'activityStatus', 'institution', 'whatsapp', 'notes', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(tracerId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    // Contact Messages PII: private admin/owner read & list; allows validated public_visitor submission with status == 'baru'
+    match /contact_messages/{messageId} {
+      allow get: if isValidId(messageId) && (isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(messageId) && isValidContactMessage(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isVerified() && incoming().ownerId == request.auth.uid) ||
+          (incoming().ownerId == 'public_visitor' && incoming().status == 'baru')
+        );
+      allow update: if isValidId(messageId) && isVerified() && isValidContactMessage(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().ownerId == request.auth.uid
+            && existing().status != 'selesai'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['subject', 'message', 'replyNote', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(messageId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
     }
   }
 }
