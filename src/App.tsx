@@ -29,6 +29,7 @@ import { ContentManager } from './components/ContentManager';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PpdbManager } from './components/PpdbManager';
 import { UserManager } from './components/UserManager';
+import { stripBasePath, withBase } from './portal/data/schoolData';
 import { PublicPortal } from './portal/PublicPortal';
 import {
   auth,
@@ -321,7 +322,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
         <div className="max-w-md w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 space-y-6">
           <div className="flex items-center gap-3.5">
             <img
-              src="/logo-sekolah.png"
+              src={withBase('logo-sekolah.png')}
               alt="Logo SMK PGRI 2 Kedondong"
               referrerPolicy="no-referrer"
               className="w-12 h-12 object-contain shrink-0"
@@ -385,7 +386,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
         <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
           <img
-            src="/logo-sekolah.png"
+            src={withBase('logo-sekolah.png')}
             alt="Logo SMK PGRI 2 Kedondong"
             referrerPolicy="no-referrer"
             className="w-9 h-9 object-contain shrink-0"
@@ -663,7 +664,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
 function isAdminLocation(): boolean {
   if (typeof window === 'undefined') return false;
   return (
-    window.location.pathname.startsWith('/admin') ||
+    stripBasePath(window.location.pathname).startsWith('/admin') ||
     new URLSearchParams(window.location.search).get('mode') === 'admin'
   );
 }
@@ -682,8 +683,9 @@ export default function App() {
   }, []);
 
   const openAdmin = useCallback(() => {
-    if (!window.location.pathname.startsWith('/admin')) {
-      window.history.pushState({}, '', '/admin');
+    const adminUrl = withBase('admin');
+    if (!stripBasePath(window.location.pathname).startsWith('/admin')) {
+      window.history.pushState({}, '', adminUrl);
     }
     setMode('admin');
     window.scrollTo({ top: 0 });
@@ -691,8 +693,8 @@ export default function App() {
 
   const openPortal = useCallback(() => {
     document.documentElement.classList.remove('dark');
-    if (window.location.pathname.startsWith('/admin')) {
-      window.history.pushState({}, '', '/');
+    if (stripBasePath(window.location.pathname).startsWith('/admin')) {
+      window.history.pushState({}, '', withBase(''));
     }
     setMode('portal');
     window.scrollTo({ top: 0 });

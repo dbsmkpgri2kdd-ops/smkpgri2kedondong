@@ -11,7 +11,7 @@ import { PpdbView } from './components/PpdbView';
 import { ProfileFullView } from './components/ProfileFullView';
 import { ProgramsSection } from './components/ProgramsSection';
 import { ServicesSection, ServiceTab } from './components/ServicesSection';
-import { ROUTE_SEO } from './data/schoolData';
+import { ROUTE_SEO, stripBasePath, withBase } from './data/schoolData';
 import { fetchPortalItems, getCachedPortalItems } from './services/schoolApi';
 import { usePortalData } from './services/usePortalData';
 import { DynamicPortalItem, PortalRoute } from './types/portal';
@@ -21,7 +21,8 @@ interface PublicPortalProps {
 }
 
 function resolveRouteFromPath(pathname: string): PortalRoute {
-  const clean = pathname.replace(/\/+$/, '') || '/';
+  const stripped = stripBasePath(pathname);
+  const clean = stripped.replace(/\/+$/, '') || '/';
   const match = (Object.keys(ROUTE_SEO) as PortalRoute[]).find(
     (r) => ROUTE_SEO[r].path === clean
   );
@@ -80,7 +81,7 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
 
   useEffect(() => {
     const onPopState = () => {
-      if (window.location.pathname.startsWith('/admin')) return;
+      if (stripBasePath(window.location.pathname).startsWith('/admin')) return;
       setActiveRoute(resolveRouteFromPath(window.location.pathname));
     };
     window.addEventListener('popstate', onPopState);
@@ -90,8 +91,9 @@ export const PublicPortal: React.FC<PublicPortalProps> = ({ onOpenAdmin }) => {
   const handleNavigate = useCallback((route: PortalRoute, sectionId?: string) => {
     setActiveRoute(route);
     const targetPath = ROUTE_SEO[route]?.path || '/';
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({}, '', targetPath);
+    const fullTargetUrl = withBase(targetPath);
+    if (window.location.pathname !== fullTargetUrl) {
+      window.history.pushState({}, '', fullTargetUrl);
     }
     if (sectionId) {
       window.setTimeout(() => {

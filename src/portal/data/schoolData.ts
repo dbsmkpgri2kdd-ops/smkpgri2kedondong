@@ -63,6 +63,28 @@ export function withBase(path: string): string {
   return `${BASE_URL}${clean}`;
 }
 
+export function stripBasePath(pathname: string): string {
+  const normalizedBase = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+  if (normalizedBase && normalizedBase !== '/' && pathname.startsWith(normalizedBase)) {
+    const rest = pathname.slice(normalizedBase.length);
+    return rest.startsWith('/') ? rest : `/${rest}`;
+  }
+  return pathname || '/';
+}
+
+export function resolveAssetUrl(url?: string): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:')
+  ) {
+    return trimmed;
+  }
+  return withBase(trimmed);
+}
+
 export const HERO_MEDIA = {
   campus: withBase('src/assets/images/hero_campus_clean_1794883667495.jpg'),
   automotiveLab: withBase('src/assets/images/lab_engineering_automotive_1794883647783.jpg'),

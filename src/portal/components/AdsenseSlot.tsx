@@ -33,8 +33,9 @@ export const AdsenseSlot: React.FC<AdsenseSlotProps> = ({
   useEffect(() => {
     if (!cleanSlot || !insRef.current) return;
     const el = insRef.current;
-    if (el.dataset.adsbygoogleStatus) return;
+    if (el.dataset.adsbygoogleStatus || el.dataset.pridaPushed === '1') return;
 
+    el.dataset.pridaPushed = '1';
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch {

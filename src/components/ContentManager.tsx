@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { User } from 'firebase/auth';
 import { Building2, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react';
 import { AVAILABLE_IMAGES, DEFAULT_SITE_SETTINGS } from '../data/seedDefaults';
+import { resolveAssetUrl } from '../portal/data/schoolData';
 import {
   removeDocument,
   saveAcademicEvent,
@@ -435,7 +436,7 @@ export const ContentManager: React.FC<ContentManagerProps> = ({
                 <div className="w-20 h-14 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
                   {item.imageUrl ? (
                     <img
-                      src={item.imageUrl}
+                      src={resolveAssetUrl(item.imageUrl)}
                       alt={item.title}
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover"
@@ -557,7 +558,7 @@ export const ContentManager: React.FC<ContentManagerProps> = ({
                   </div>
                   {prog.imageUrl && (
                     <img
-                      src={prog.imageUrl}
+                      src={resolveAssetUrl(prog.imageUrl)}
                       alt={prog.name}
                       referrerPolicy="no-referrer"
                       className="w-16 h-12 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"

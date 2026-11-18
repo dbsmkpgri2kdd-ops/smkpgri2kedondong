@@ -31,6 +31,7 @@ import {
   EDITORIAL_ARTICLES,
   FAQ_ITEMS,
   HERO_MEDIA,
+  resolveAssetUrl,
   SCHOOL_IDENTITY,
   SCHOOL_NEWS,
   STUDY_PROGRAMS,
@@ -189,7 +190,7 @@ export function usePortalData() {
               competencies: p.competencies || [],
               careers: p.careers || [],
               certification: p.certification,
-              image: p.imageUrl || fallbackImg,
+              image: resolveAssetUrl(p.imageUrl) || fallbackImg,
             };
           });
           const order = ['TKR', 'TSM', 'TKJ', 'TAV', 'BD'];
