@@ -1,0 +1,26 @@
+{
+  "name": "Portal Digital SMK PGRI 2 Kedondong — PRIDA",
+  "short_name": "SMK PGRI 2 KDD",
+  "description": "Portal resmi SMK PGRI 2 Kedondong: profil sekolah, program keahlian, layanan akademik, literasi kejuruan, dan media sekolah.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "lang": "id",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

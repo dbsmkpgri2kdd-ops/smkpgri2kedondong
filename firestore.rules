@@ -1,0 +1,474 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // PRIMITIVES & IDENTITY HELPERS
+    // =========================================================================
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'dbsmkpgri2kdd@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+
+    function isStringBounded(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isBoundedStringList(arr, maxItems) {
+      return arr is list && arr.size() <= maxItems && (arr.size() == 0 || arr[0] is string);
+    }
+
+    // =========================================================================
+    // VALIDATION BLUEPRINTS (ANTI-UPDATE-GAP)
+    // =========================================================================
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'unit', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'role', 'unit', 'status', 'ownerId', 'createdAt', 'updatedAt', 'lastActiveAt'])
+        && isValidId(data.uid)
+        && isStringBounded(data.displayName, 2, 120)
+        && isStringBounded(data.email, 5, 160)
+        && data.role in ['super_admin', 'admin', 'editor', 'operator_ppdb', 'viewer']
+        && isStringBounded(data.unit, 1, 100)
+        && data.status in ['active', 'suspended', 'pending']
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('lastActiveAt' in data) || data.lastActiveAt is timestamp);
+    }
+
+    function isValidAdminGrant(data) {
+      return data.keys().hasAll(['uid', 'email', 'level', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'level', 'grantedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && isStringBounded(data.email, 5, 160)
+        && data.level in ['super_admin', 'admin']
+        && isValidId(data.grantedBy)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSiteSettings(data) {
+      return data.keys().hasAll([
+          'schoolName', 'shortName', 'npsn', 'address', 'hours', 'email', 'domain',
+          'vision', 'missions', 'principalGreeting', 'principalClosing',
+          'ppdbOpen', 'ppdbWaveLabel', 'ownerId', 'updatedBy', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'schoolName', 'shortName', 'npsn', 'address', 'hours', 'email', 'domain',
+          'vision', 'missions', 'principalGreeting', 'principalClosing',
+          'ppdbOpen', 'ppdbWaveLabel', 'announcementBanner',
+          'instagramUrl', 'tiktokUrl', 'whatsappUrl',
+          'ownerId', 'updatedBy', 'updatedAt'
+        ])
+        && isStringBounded(data.schoolName, 3, 120)
+        && isStringBounded(data.shortName, 2, 32)
+        && isStringBounded(data.npsn, 8, 16)
+        && isStringBounded(data.address, 10, 280)
+        && isStringBounded(data.hours, 5, 120)
+        && isStringBounded(data.email, 5, 160)
+        && isStringBounded(data.domain, 5, 160)
+        && isStringBounded(data.vision, 10, 600)
+        && isBoundedStringList(data.missions, 10)
+        && isStringBounded(data.principalGreeting, 10, 1200)
+        && isStringBounded(data.principalClosing, 10, 1200)
+        && data.ppdbOpen is bool
+        && isStringBounded(data.ppdbWaveLabel, 1, 120)
+        && (!('announcementBanner' in data) || isStringBounded(data.announcementBanner, 0, 300))
+        && (!('instagramUrl' in data) || isStringBounded(data.instagramUrl, 0, 240))
+        && (!('tiktokUrl' in data) || isStringBounded(data.tiktokUrl, 0, 240))
+        && (!('whatsappUrl' in data) || isStringBounded(data.whatsappUrl, 0, 240))
+        && isValidId(data.ownerId)
+        && isStringBounded(data.updatedBy, 2, 120)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNewsItem(data) {
+      return data.keys().hasAll(['title', 'category', 'dateLabel', 'summary', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['title', 'category', 'dateLabel', 'summary', 'status', 'imageUrl', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.title, 4, 200)
+        && isStringBounded(data.category, 2, 80)
+        && isStringBounded(data.dateLabel, 4, 60)
+        && isStringBounded(data.summary, 10, 1000)
+        && data.status in ['published', 'draft', 'archived']
+        && (!('imageUrl' in data) || isStringBounded(data.imageUrl, 0, 300))
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStudyProgram(data) {
+      return data.keys().hasAll(['code', 'name', 'category', 'categoryLabel', 'summary', 'competencies', 'careers', 'certification', 'active', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['code', 'name', 'category', 'categoryLabel', 'summary', 'competencies', 'careers', 'certification', 'imageUrl', 'active', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.code, 2, 12)
+        && data.code.matches('^[A-Z0-9_\\-]+$')
+        && isStringBounded(data.name, 3, 140)
+        && data.category in ['rekayasa', 'tik', 'bisnis']
+        && isStringBounded(data.categoryLabel, 3, 80)
+        && isStringBounded(data.summary, 10, 1000)
+        && isBoundedStringList(data.competencies, 12)
+        && isBoundedStringList(data.careers, 12)
+        && isStringBounded(data.certification, 3, 200)
+        && (!('imageUrl' in data) || isStringBounded(data.imageUrl, 0, 300))
+        && data.active is bool
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidEditorialArticle(data) {
+      return data.keys().hasAll(['slug', 'title', 'category', 'author', 'publishedAtLabel', 'readTime', 'excerpt', 'paragraphs', 'keyTakeaways', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['slug', 'title', 'category', 'author', 'publishedAtLabel', 'readTime', 'excerpt', 'paragraphs', 'keyTakeaways', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.slug, 3, 160)
+        && data.slug.matches('^[a-z0-9\\-]+$')
+        && isStringBounded(data.title, 5, 220)
+        && isStringBounded(data.category, 2, 80)
+        && isStringBounded(data.author, 2, 120)
+        && isStringBounded(data.publishedAtLabel, 4, 60)
+        && isStringBounded(data.readTime, 2, 40)
+        && isStringBounded(data.excerpt, 10, 600)
+        && isBoundedStringList(data.paragraphs, 20)
+        && isBoundedStringList(data.keyTakeaways, 10)
+        && data.status in ['published', 'draft']
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPtkMember(data) {
+      return data.keys().hasAll(['name', 'position', 'department', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['name', 'position', 'department', 'nipOrNuptk', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.name, 2, 140)
+        && isStringBounded(data.position, 2, 140)
+        && isStringBounded(data.department, 2, 80)
+        && (!('nipOrNuptk' in data) || isStringBounded(data.nipOrNuptk, 0, 40))
+        && data.status in ['active', 'inactive']
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAcademicEvent(data) {
+      return data.keys().hasAll(['period', 'title', 'description', 'orderIndex', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['period', 'title', 'description', 'orderIndex', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.period, 3, 80)
+        && isStringBounded(data.title, 4, 180)
+        && isStringBounded(data.description, 5, 600)
+        && data.orderIndex is int
+        && data.orderIndex >= 0 && data.orderIndex <= 500
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFaqItem(data) {
+      return data.keys().hasAll(['question', 'answer', 'category', 'orderIndex', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['question', 'answer', 'category', 'orderIndex', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.question, 5, 240)
+        && isStringBounded(data.answer, 10, 1000)
+        && isStringBounded(data.category, 2, 60)
+        && data.orderIndex is int
+        && data.orderIndex >= 0 && data.orderIndex <= 500
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPpdbRegistration(data) {
+      return data.keys().hasAll(['fullName', 'nisn', 'originSchool', 'programCode', 'whatsapp', 'status', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['fullName', 'nisn', 'originSchool', 'programCode', 'whatsapp', 'status', 'notes', 'ownerId', 'createdAt', 'updatedAt'])
+        && isStringBounded(data.fullName, 2, 140)
+        && isStringBounded(data.nisn, 5, 20)
+        && isStringBounded(data.originSchool, 3, 140)
+        && data.programCode in ['TKR', 'TSM', 'TKJ', 'TAV', 'BD']
+        && isStringBounded(data.whatsapp, 8, 24)
+        && data.status in ['menunggu', 'terverifikasi', 'diterima', 'ditolak']
+        && (!('notes' in data) || isStringBounded(data.notes, 0, 400))
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAnalyticsDaily(data) {
+      return data.keys().hasAll(['dateKey', 'visitors', 'pageViews', 'ppdbClicks', 'ukkChecks', 'avgDurationSec', 'ownerId', 'updatedAt'])
+        && data.keys().hasOnly(['dateKey', 'visitors', 'pageViews', 'ppdbClicks', 'ukkChecks', 'avgDurationSec', 'ownerId', 'updatedAt'])
+        && isStringBounded(data.dateKey, 10, 10)
+        && data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.visitors is int && data.visitors >= 0
+        && data.pageViews is int && data.pageViews >= 0
+        && data.ppdbClicks is int && data.ppdbClicks >= 0
+        && data.ukkChecks is int && data.ukkChecks >= 0
+        && data.avgDurationSec is int && data.avgDurationSec >= 0
+        && isValidId(data.ownerId)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAnalyticsEvent(data) {
+      return data.keys().hasAll(['route', 'actionType', 'device', 'referrer', 'ownerId', 'createdAt'])
+        && data.keys().hasOnly(['route', 'actionType', 'device', 'referrer', 'ownerId', 'createdAt'])
+        && data.route in ['beranda', 'profil', 'jurusan', 'ppdb', 'layanan', 'literasi', 'media', 'kontak']
+        && data.actionType in ['pageview', 'ppdb_submit', 'ukk_lookup', 'article_read']
+        && data.device in ['Desktop', 'Mobile', 'Tablet']
+        && isStringBounded(data.referrer, 1, 120)
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorName', 'action', 'collectionName', 'targetTitle', 'ownerId', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'actorName', 'action', 'collectionName', 'targetTitle', 'ownerId', 'createdAt'])
+        && isValidId(data.actorUid)
+        && isStringBounded(data.actorName, 2, 120)
+        && data.action in ['create', 'update', 'delete', 'seed']
+        && isStringBounded(data.collectionName, 2, 60)
+        && isStringBounded(data.targetTitle, 2, 200)
+        && isValidId(data.ownerId)
+        && data.createdAt is timestamp;
+    }
+
+    // =========================================================================
+    // COLLECTION RULES
+    // =========================================================================
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
+
+      allow create: if isVerified() && isValidId(userId) && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() || (
+            isOwner(userId)
+            && incoming().uid == request.auth.uid
+            && incoming().ownerId == request.auth.uid
+            && incoming().role == 'viewer'
+            && incoming().status == 'pending'
+          )
+        );
+
+      allow update: if isVerified() && isValidId(userId) && isValidUserProfile(incoming()) && (
+        (isAdmin() && incoming().uid == existing().uid && incoming().ownerId == existing().ownerId && incoming().createdAt == existing().createdAt && incoming().updatedAt == request.time) ||
+        (
+          isOwner(userId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'lastActiveAt', 'updatedAt'])
+          && incoming().uid == existing().uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+        )
+      );
+
+      allow delete: if isValidId(userId) && isAdmin() && userId != request.auth.uid;
+    }
+
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin();
+      allow create: if isValidId(userId) && isBootstrappedAdmin() && isValidAdminGrant(incoming()) && incoming().createdAt == request.time;
+      allow update: if isValidId(userId) && isBootstrappedAdmin() && isValidAdminGrant(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isValidId(userId) && isBootstrappedAdmin() && userId != request.auth.uid;
+    }
+
+    // Public-readable school profile settings (published portal identity)
+    match /site_settings/{settingId} {
+      allow get: if isValidId(settingId) && (existing().schoolName is string || isAdmin());
+      allow list: if resource.data.schoolName is string || isBootstrappedAdmin();
+      allow create: if isValidId(settingId) && isVerified() && isValidSiteSettings(incoming()) && incoming().ownerId == request.auth.uid && incoming().updatedAt == request.time && isAdmin();
+      allow update: if isValidId(settingId) && isVerified() && isValidSiteSettings(incoming()) && incoming().ownerId == existing().ownerId && incoming().updatedAt == request.time && isAdmin();
+      allow delete: if false;
+    }
+
+    // Public-readable ONLY when status == 'published'
+    match /news/{newsId} {
+      allow get: if isValidId(newsId) && (existing().status == 'published' || isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if resource.data.status == 'published' || isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(newsId) && isVerified() && isValidNewsItem(incoming()) && incoming().ownerId == request.auth.uid && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(newsId) && isVerified() && isValidNewsItem(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'dateLabel', 'summary', 'status', 'imageUrl', 'updatedAt']))
+        );
+      allow delete: if isValidId(newsId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    // Public-readable ONLY when active == true
+    match /programs/{programId} {
+      allow get: if isValidId(programId) && (existing().active == true || isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if resource.data.active == true || isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(programId) && isVerified() && isValidStudyProgram(incoming()) && incoming().ownerId == request.auth.uid && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(programId) && isVerified() && isValidStudyProgram(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'categoryLabel', 'summary', 'competencies', 'careers', 'certification', 'imageUrl', 'active', 'updatedAt']))
+        );
+      allow delete: if isValidId(programId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    // Public-readable ONLY when status == 'published'
+    match /articles/{articleId} {
+      allow get: if isValidId(articleId) && (existing().status == 'published' || isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if resource.data.status == 'published' || isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(articleId) && isVerified() && isValidEditorialArticle(incoming()) && incoming().ownerId == request.auth.uid && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(articleId) && isVerified() && isValidEditorialArticle(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['slug', 'title', 'category', 'author', 'publishedAtLabel', 'readTime', 'excerpt', 'paragraphs', 'keyTakeaways', 'status', 'updatedAt']))
+        );
+      allow delete: if isValidId(articleId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    // Public-readable ONLY when status == 'active'
+    match /ptk_members/{ptkId} {
+      allow get: if isValidId(ptkId) && (existing().status == 'active' || isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if resource.data.status == 'active' || isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(ptkId) && isVerified() && isValidPtkMember(incoming()) && incoming().ownerId == request.auth.uid && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(ptkId) && isVerified() && isValidPtkMember(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'position', 'department', 'nipOrNuptk', 'status', 'updatedAt']))
+        );
+      allow delete: if isValidId(ptkId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    match /academic_events/{eventId} {
+      allow get: if isValidId(eventId) && (existing().orderIndex >= 0 || isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if resource.data.orderIndex >= 0 || isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(eventId) && isVerified() && isValidAcademicEvent(incoming()) && incoming().ownerId == request.auth.uid && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(eventId) && isVerified() && isValidAcademicEvent(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['period', 'title', 'description', 'orderIndex', 'updatedAt']))
+        );
+      allow delete: if isValidId(eventId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    match /faqs/{faqId} {
+      allow get: if isValidId(faqId) && (existing().orderIndex >= 0 || isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if resource.data.orderIndex >= 0 || isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(faqId) && isVerified() && isValidFaqItem(incoming()) && incoming().ownerId == request.auth.uid && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(faqId) && isVerified() && isValidFaqItem(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['question', 'answer', 'category', 'orderIndex', 'updatedAt']))
+        );
+      allow delete: if isValidId(faqId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    // PPDB PII: strictly private read/list; allows validated public applicant create with status == 'menunggu'
+    match /ppdb_registrations/{regId} {
+      allow get: if isValidId(regId) && (isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(regId) && isValidPpdbRegistration(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isVerified() && incoming().ownerId == request.auth.uid) ||
+          (incoming().ownerId == 'public_visitor' && incoming().status == 'menunggu')
+        );
+      allow update: if isValidId(regId) && isVerified() && isValidPpdbRegistration(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().ownerId == request.auth.uid
+            && !(existing().status in ['diterima', 'ditolak'])
+            && incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'nisn', 'originSchool', 'programCode', 'whatsapp', 'notes', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(regId) && isVerified() && (isAdmin() || existing().ownerId == request.auth.uid);
+    }
+
+    match /analytics_daily/{dateId} {
+      allow get: if isValidId(dateId) && (isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(dateId) && isVerified() && isValidAnalyticsDaily(incoming()) && incoming().ownerId == request.auth.uid && incoming().updatedAt == request.time;
+      allow update: if isValidId(dateId) && isVerified() && isValidAnalyticsDaily(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().dateKey == existing().dateKey
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['visitors', 'pageViews', 'ppdbClicks', 'ukkChecks', 'avgDurationSec', 'updatedAt']))
+        );
+      allow delete: if isValidId(dateId) && isAdmin();
+    }
+
+    // Live visitor telemetry: private read/list; validated public_visitor create allowed
+    match /analytics_events/{eventId} {
+      allow get: if isValidId(eventId) && (isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(eventId) && isValidAnalyticsEvent(incoming())
+        && incoming().createdAt == request.time
+        && (
+          (isVerified() && incoming().ownerId == request.auth.uid) ||
+          (incoming().ownerId == 'public_visitor')
+        );
+      allow update: if false;
+      allow delete: if isValidId(eventId) && isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && (isAdmin() || (isVerified() && existing().ownerId == request.auth.uid));
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.ownerId == request.auth.uid);
+      allow create: if isValidId(logId) && isVerified() && isValidAuditLog(incoming()) && incoming().ownerId == request.auth.uid && incoming().actorUid == request.auth.uid && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

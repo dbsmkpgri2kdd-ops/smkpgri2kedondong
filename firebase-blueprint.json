@@ -1,0 +1,337 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Pengguna panel admin dan staf pengelola portal SMK PGRI 2 Kedondong",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "ID unik pengguna"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin", "admin", "editor", "operator_ppdb", "viewer"]
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended", "pending"]
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastActiveAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "email", "role", "unit", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "AdminGrant": {
+      "title": "AdminGrant",
+      "description": "Dokumen penanda hak akses administrator tepercaya",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "level": {
+          "type": "string",
+          "enum": ["super_admin", "admin"]
+        },
+        "grantedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "level", "grantedBy", "createdAt"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Konfigurasi identitas sekolah, visi misi, sambutan kepala sekolah, dan status PPDB",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "shortName": { "type": "string", "minLength": 2, "maxLength": 32 },
+        "npsn": { "type": "string", "minLength": 8, "maxLength": 16 },
+        "address": { "type": "string", "minLength": 10, "maxLength": 280 },
+        "hours": { "type": "string", "minLength": 5, "maxLength": 120 },
+        "email": { "type": "string", "minLength": 5, "maxLength": 160 },
+        "domain": { "type": "string", "minLength": 5, "maxLength": 160 },
+        "vision": { "type": "string", "minLength": 10, "maxLength": 600 },
+        "missions": { "type": "array", "description": "Maksimal 10 butir misi" },
+        "principalGreeting": { "type": "string", "minLength": 10, "maxLength": 1200 },
+        "principalClosing": { "type": "string", "minLength": 10, "maxLength": 1200 },
+        "ppdbOpen": { "type": "boolean" },
+        "ppdbWaveLabel": { "type": "string", "maxLength": 120 },
+        "announcementBanner": { "type": "string", "maxLength": 300 },
+        "instagramUrl": { "type": "string", "maxLength": 240 },
+        "tiktokUrl": { "type": "string", "maxLength": 240 },
+        "whatsappUrl": { "type": "string", "maxLength": 240 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "updatedBy": { "type": "string", "maxLength": 120 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["schoolName", "shortName", "npsn", "address", "hours", "email", "domain", "vision", "missions", "principalGreeting", "principalClosing", "ppdbOpen", "ppdbWaveLabel", "ownerId", "updatedBy", "updatedAt"]
+    },
+    "NewsItem": {
+      "title": "NewsItem",
+      "description": "Berita dan pengumuman portal SMK PGRI 2 Kedondong",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 4, "maxLength": 200 },
+        "category": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "dateLabel": { "type": "string", "minLength": 4, "maxLength": 60 },
+        "summary": { "type": "string", "minLength": 10, "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "imageUrl": { "type": "string", "maxLength": 300 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "category", "dateLabel", "summary", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "StudyProgram": {
+      "title": "StudyProgram",
+      "description": "Program keahlian / jurusan SMK PGRI 2 Kedondong",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "minLength": 2, "maxLength": 12, "pattern": "^[A-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "category": { "type": "string", "enum": ["rekayasa", "tik", "bisnis"] },
+        "categoryLabel": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "summary": { "type": "string", "minLength": 10, "maxLength": 1000 },
+        "competencies": { "type": "array" },
+        "careers": { "type": "array" },
+        "certification": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "imageUrl": { "type": "string", "maxLength": 300 },
+        "active": { "type": "boolean" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "name", "category", "categoryLabel", "summary", "competencies", "careers", "certification", "active", "ownerId", "createdAt", "updatedAt"]
+    },
+    "EditorialArticle": {
+      "title": "EditorialArticle",
+      "description": "Artikel literasi kejuruan dan panduan keselamatan bengkel",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string", "minLength": 3, "maxLength": 160, "pattern": "^[a-z0-9\\-]+$" },
+        "title": { "type": "string", "minLength": 5, "maxLength": 220 },
+        "category": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "author": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "publishedAtLabel": { "type": "string", "minLength": 4, "maxLength": 60 },
+        "readTime": { "type": "string", "minLength": 2, "maxLength": 40 },
+        "excerpt": { "type": "string", "minLength": 10, "maxLength": 600 },
+        "paragraphs": { "type": "array" },
+        "keyTakeaways": { "type": "array" },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["slug", "title", "category", "author", "publishedAtLabel", "readTime", "excerpt", "paragraphs", "keyTakeaways", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "PtkMember": {
+      "title": "PtkMember",
+      "description": "Direktori Pendidik dan Tenaga Kependidikan (PTK)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "position": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "department": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "nipOrNuptk": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "position", "department", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "AcademicEvent": {
+      "title": "AcademicEvent",
+      "description": "Agenda kalender akademik tahunan sekolah",
+      "type": "object",
+      "properties": {
+        "period": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "title": { "type": "string", "minLength": 4, "maxLength": 180 },
+        "description": { "type": "string", "minLength": 5, "maxLength": 600 },
+        "orderIndex": { "type": "integer" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["period", "title", "description", "orderIndex", "ownerId", "createdAt", "updatedAt"]
+    },
+    "FaqItem": {
+      "title": "FaqItem",
+      "description": "Pertanyaan umum PPDB, UKK, dan layanan sekolah",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string", "minLength": 5, "maxLength": 240 },
+        "answer": { "type": "string", "minLength": 10, "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 60 },
+        "orderIndex": { "type": "integer" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["question", "answer", "category", "orderIndex", "ownerId", "createdAt", "updatedAt"]
+    },
+    "PpdbRegistration": {
+      "title": "PpdbRegistration",
+      "description": "Data calon peserta didik baru PPDB/SPMB Online",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "nisn": { "type": "string", "minLength": 5, "maxLength": 20 },
+        "originSchool": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "programCode": { "type": "string", "enum": ["TKR", "TSM", "TKJ", "TAV", "BD"] },
+        "whatsapp": { "type": "string", "minLength": 8, "maxLength": 24 },
+        "status": { "type": "string", "enum": ["menunggu", "terverifikasi", "diterima", "ditolak"] },
+        "notes": { "type": "string", "maxLength": 400 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "nisn", "originSchool", "programCode", "whatsapp", "status", "ownerId", "createdAt", "updatedAt"]
+    },
+    "AnalyticsDaily": {
+      "title": "AnalyticsDaily",
+      "description": "Ringkasan metrik kunjungan harian portal sekolah",
+      "type": "object",
+      "properties": {
+        "dateKey": { "type": "string", "minLength": 10, "maxLength": 10, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "visitors": { "type": "integer" },
+        "pageViews": { "type": "integer" },
+        "ppdbClicks": { "type": "integer" },
+        "ukkChecks": { "type": "integer" },
+        "avgDurationSec": { "type": "integer" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["dateKey", "visitors", "pageViews", "ppdbClicks", "ukkChecks", "avgDurationSec", "ownerId", "updatedAt"]
+    },
+    "AnalyticsEvent": {
+      "title": "AnalyticsEvent",
+      "description": "Log kejadian kunjungan real-time per halaman portal",
+      "type": "object",
+      "properties": {
+        "route": { "type": "string", "enum": ["beranda", "profil", "jurusan", "ppdb", "layanan", "literasi", "media", "kontak"] },
+        "actionType": { "type": "string", "enum": ["pageview", "ppdb_submit", "ukk_lookup", "article_read"] },
+        "device": { "type": "string", "enum": ["Desktop", "Mobile", "Tablet"] },
+        "referrer": { "type": "string", "maxLength": 120 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["route", "actionType", "device", "referrer", "ownerId", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Rekam jejak aktivitas CRUD admin di panel",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorName": { "type": "string", "maxLength": 120 },
+        "action": { "type": "string", "enum": ["create", "update", "delete", "seed"] },
+        "collectionName": { "type": "string", "maxLength": 60 },
+        "targetTitle": { "type": "string", "maxLength": 200 },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorName", "action", "collectionName", "targetTitle", "ownerId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Direktori akun pengelola dan staf portal SMK PGRI 2 Kedondong"
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminGrant" },
+      "description": "Daftar otorisasi admin terverifikasi"
+    },
+    "/site_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Pengaturan profil sekolah, visi misi, dan banner portal"
+    },
+    "/news/{newsId}": {
+      "schema": { "$ref": "#/entities/NewsItem" },
+      "description": "Berita dan pengumuman resmi sekolah"
+    },
+    "/programs/{programId}": {
+      "schema": { "$ref": "#/entities/StudyProgram" },
+      "description": "Program keahlian TKR, TSM, TKJ, TAV, dan Bisnis Digital"
+    },
+    "/articles/{articleId}": {
+      "schema": { "$ref": "#/entities/EditorialArticle" },
+      "description": "Artikel literasi kejuruan dan panduan K3"
+    },
+    "/ptk_members/{ptkId}": {
+      "schema": { "$ref": "#/entities/PtkMember" },
+      "description": "Direktori Pendidik dan Tenaga Kependidikan (PTK)"
+    },
+    "/academic_events/{eventId}": {
+      "schema": { "$ref": "#/entities/AcademicEvent" },
+      "description": "Agenda kalender akademik sekolah"
+    },
+    "/faqs/{faqId}": {
+      "schema": { "$ref": "#/entities/FaqItem" },
+      "description": "Pertanyaan umum (FAQ) portal sekolah"
+    },
+    "/ppdb_registrations/{regId}": {
+      "schema": { "$ref": "#/entities/PpdbRegistration" },
+      "description": "Pendaftar PPDB / SPMB Online"
+    },
+    "/analytics_daily/{dateId}": {
+      "schema": { "$ref": "#/entities/AnalyticsDaily" },
+      "description": "Metrik agregasi trafik harian real-time"
+    },
+    "/analytics_events/{eventId}": {
+      "schema": { "$ref": "#/entities/AnalyticsEvent" },
+      "description": "Aliran peristiwa kunjungan halaman real-time"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Log aktivitas perubahan data oleh admin"
+    }
+  }
+}

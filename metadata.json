@@ -1,0 +1,6 @@
+{
+  "name": "Panel Admin PRIDA — SMK PGRI 2 Kedondong",
+  "description": "Dasbor administrasi terpadu untuk pengelolaan konten portal sekolah, manajemen pengguna & hak akses (RBAC), PPDB, dan analitik pengunjung real-time SMK PGRI 2 Kedondong.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
