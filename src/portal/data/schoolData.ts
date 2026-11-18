@@ -56,7 +56,8 @@ export const ADSENSE_CONFIG = {
   },
 };
 
-const BASE_URL = import.meta.env.BASE_URL || '/';
+const BASE_URL =
+  (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
 
 export function withBase(path: string): string {
   const clean = path.replace(/^\/+/, '');

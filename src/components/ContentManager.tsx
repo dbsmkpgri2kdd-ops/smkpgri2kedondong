@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { User } from 'firebase/auth';
-import { Building2, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react';
+import { Building2, Pencil, Plus, RefreshCw, Save, Search, Trash2, Users, X } from 'lucide-react';
 import { AVAILABLE_IMAGES, DEFAULT_SITE_SETTINGS } from '../data/seedDefaults';
 import { resolveAssetUrl } from '../portal/data/schoolData';
+import { fetchPtkDirectory, getCachedPtkDirectory } from '../portal/services/schoolApi';
+import { PtkMember as SheetPtkMember } from '../portal/types/portal';
 import {
   removeDocument,
+  removeSeededPtkPlaceholders,
   saveAcademicEvent,
   saveArticle,
   saveFaqItem,
@@ -105,7 +108,7 @@ export const ContentManager: React.FC<ContentManagerProps> = ({
     status: 'published' as EditorialArticle['status'],
   });
 
-  // PTK Modal State
+  // PTK Modal & Live Spreadsheet State
   const [ptkModal, setPtkModal] = useState(false);
   const [editingPtk, setEditingPtk] = useState<PtkMember | null>(null);
   const [ptkForm, setPtkForm] = useState({
@@ -115,6 +118,29 @@ export const ContentManager: React.FC<ContentManagerProps> = ({
     nipOrNuptk: '',
     status: 'active' as PtkMember['status'],
   });
+  const [sheetPtk, setSheetPtk] = useState<SheetPtkMember[]>(() => getCachedPtkDirectory());
+  const [sheetPtkLoading, setSheetPtkLoading] = useState(false);
+  const [sheetPtkError, setSheetPtkError] = useState<string | null>(null);
+
+  const loadSpreadsheetPtk = async () => {
+    setSheetPtkLoading(true);
+    setSheetPtkError(null);
+    try {
+      const list = await fetchPtkDirectory();
+      setSheetPtk(list);
+    } catch {
+      setSheetPtkError('Gagal memuat data PTK dari Google Spreadsheet.');
+    } finally {
+      setSheetPtkLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (subTab === 'ptk' && sheetPtk.length === 0 && !sheetPtkLoading && !sheetPtkError) {
+      loadSpreadsheetPtk();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subTab]);
 
   // Academic Event Modal
   const [calModal, setCalModal] = useState(false);
@@ -226,6 +252,22 @@ export const ContentManager: React.FC<ContentManagerProps> = ({
           m.department.toLowerCase().includes(q)
       ),
     [ptkMembers, q]
+  );
+
+  const filteredSheetPtk = useMemo(
+    () =>
+      sheetPtk.filter(
+        (m) =>
+          !q ||
+          m.Nama.toLowerCase().includes(q) ||
+          (m.Jabatan || '').toLowerCase().includes(q)
+      ),
+    [sheetPtk, q]
+  );
+
+  const seededPlaceholderIds = useMemo(
+    () => ptkMembers.filter((m) => m.id.startsWith('ptk_seed_')).map((m) => m.id),
+    [ptkMembers]
   );
 
   const sortedCalendar = useMemo(
@@ -707,87 +749,186 @@ export const ContentManager: React.FC<ContentManagerProps> = ({
 
       {/* 4. DIREKTORI PTK */}
       {subTab === 'ptk' && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-800/40">
-                  <th className="py-3 px-4">Nama Pendidik / Tenaga Kependidikan</th>
-                  <th className="py-3 px-4">Jabatan</th>
-                  <th className="py-3 px-4">Unit / Jurusan</th>
-                  <th className="py-3 px-4">NIP / NUPTK</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
-                {filteredPtk.map((m) => (
-                  <tr key={m.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">
-                      {m.name}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">
-                      {m.position}
-                    </td>
-                    <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">
-                      {m.department}
-                    </td>
-                    <td className="py-3 px-4 text-xs font-mono tabular-nums text-slate-500">
-                      {m.nipOrNuptk || '-'}
-                    </td>
-                    <td className="py-3 px-4 text-xs">
-                      <span className={m.status === 'active' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-500'}>
-                        {m.status === 'active' ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="inline-flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPtk(m);
-                            setPtkForm({
-                              name: m.name,
-                              position: m.position,
-                              department: m.department,
-                              nipOrNuptk: m.nipOrNuptk || '',
-                              status: m.status,
-                            });
-                            setPtkModal(true);
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit
-                        </button>
-                        {confirmDeleteKey === `ptk:${m.id}` ? (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              await removeDocument(currentUser, 'ptk_members', m.id, m.name);
-                              setConfirmDeleteKey(null);
-                              onNotify(`Data PTK "${m.name}" dihapus.`);
-                            }}
-                            className="px-2.5 py-1.5 text-xs font-medium text-white bg-red-600 rounded-md"
-                          >
-                            Konfirmasi
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteKey(`ptk:${m.id}`)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Hapus
-                          </button>
-                        )}
+        <div className="space-y-6">
+          {/* Sumber Utama: Live Google Spreadsheet */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    Direktori PTK Utama — Google Spreadsheet Sekolah ({sheetPtk.length} GTK)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Portal publik membaca langsung daftar guru dan tenaga kependidikan dari Google
+                  Spreadsheet sekolah agar perubahan di Spreadsheet langsung tampil di website.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadSpreadsheetPtk}
+                disabled={sheetPtkLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${sheetPtkLoading ? 'animate-spin' : ''}`} />
+                {sheetPtkLoading ? 'Memuat...' : 'Sinkron Spreadsheet'}
+              </button>
+            </div>
+
+            {sheetPtkError && sheetPtk.length === 0 && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300">
+                {sheetPtkError}
+              </div>
+            )}
+
+            {filteredSheetPtk.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-1">
+                {filteredSheetPtk.map((guru, idx) => (
+                  <div
+                    key={`${guru.Nama}-${idx}`}
+                    className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40"
+                  >
+                    {guru.Foto ? (
+                      <img
+                        src={guru.Foto}
+                        alt={guru.Nama}
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-lg object-cover bg-slate-200 dark:bg-slate-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                        {guru.Nama.slice(0, 2).toUpperCase()}
                       </div>
-                    </td>
-                  </tr>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                        {guru.Nama}
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {guru.Jabatan}
+                      </p>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
+          </div>
+
+          {/* PTK Tambahan / Override di Firestore */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  PTK Tambahan / Khusus di Firestore ({filteredPtk.length})
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Opsional: data di sini melengkapi daftar dari Google Spreadsheet.
+                </p>
+              </div>
+              {seededPlaceholderIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await removeSeededPtkPlaceholders(currentUser, seededPlaceholderIds);
+                    onNotify(`${seededPlaceholderIds.length} data contoh PTK dihapus.`);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200/70 rounded-lg"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus {seededPlaceholderIds.length} Data Contoh Bawaan
+                </button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-50/70 dark:bg-slate-800/40">
+                    <th className="py-3 px-4">Nama Pendidik / Tenaga Kependidikan</th>
+                    <th className="py-3 px-4">Jabatan</th>
+                    <th className="py-3 px-4">Unit / Jurusan</th>
+                    <th className="py-3 px-4">NIP / NUPTK</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                  {filteredPtk.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-6 px-4 text-center text-xs text-slate-500">
+                        Belum ada data PTK tambahan di Firestore. Direktori utama menggunakan Google Spreadsheet di atas.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredPtk.map((m) => (
+                      <tr key={m.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                        <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">
+                          {m.name}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-700 dark:text-slate-300">
+                          {m.position}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-400">
+                          {m.department}
+                        </td>
+                        <td className="py-3 px-4 text-xs font-mono tabular-nums text-slate-500">
+                          {m.nipOrNuptk || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-xs">
+                          <span className={m.status === 'active' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-slate-500'}>
+                            {m.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingPtk(m);
+                                setPtkForm({
+                                  name: m.name,
+                                  position: m.position,
+                                  department: m.department,
+                                  nipOrNuptk: m.nipOrNuptk || '',
+                                  status: m.status,
+                                });
+                                setPtkModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                            {confirmDeleteKey === `ptk:${m.id}` ? (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await removeDocument(currentUser, 'ptk_members', m.id, m.name);
+                                  setConfirmDeleteKey(null);
+                                  onNotify(`Data PTK "${m.name}" dihapus.`);
+                                }}
+                                className="px-2.5 py-1.5 text-xs font-medium text-white bg-red-600 rounded-md"
+                              >
+                                Konfirmasi
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteKey(`ptk:${m.id}`)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Hapus
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

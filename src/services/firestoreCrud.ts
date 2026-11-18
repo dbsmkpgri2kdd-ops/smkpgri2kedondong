@@ -18,7 +18,6 @@ import {
   DEFAULT_NEWS,
   DEFAULT_PPDB,
   DEFAULT_PROGRAMS,
-  DEFAULT_PTK,
   DEFAULT_SITE_SETTINGS,
 } from '../data/seedDefaults';
 import {
@@ -185,16 +184,6 @@ export async function seedInitialPortalData(actor: User): Promise<void> {
       const id = `article_seed_${idx + 1}`;
       batch.set(doc(db, 'articles', id), {
         ...art,
-        ownerId: uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    });
-
-    DEFAULT_PTK.forEach((ptk, idx) => {
-      const id = `ptk_seed_${idx + 1}`;
-      batch.set(doc(db, 'ptk_members', id), {
-        ...ptk,
         ownerId: uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -449,6 +438,23 @@ export async function savePtkMember(
     }
   } catch (error) {
     handleFirestoreError(error, existingId ? OperationType.UPDATE : OperationType.CREATE, path);
+  }
+}
+
+export async function removeSeededPtkPlaceholders(
+  actor: User,
+  seededIds: string[]
+): Promise<void> {
+  if (seededIds.length === 0) return;
+  try {
+    const batch = writeBatch(db);
+    seededIds.forEach((id) => {
+      batch.delete(doc(db, 'ptk_members', id));
+    });
+    await batch.commit();
+    await logAuditAction(actor, 'delete', 'ptk_members', `Hapus ${seededIds.length} data contoh PTK`);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, 'ptk_members');
   }
 }
 

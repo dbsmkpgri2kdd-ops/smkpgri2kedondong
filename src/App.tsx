@@ -150,9 +150,13 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           ? query(colRef, orderBy('createdAt', 'desc'), limit(maxRows))
           : query(colRef, limit(maxRows));
       }
-      return useCreatedOrder
-        ? query(colRef, where('ownerId', '==', user.uid), orderBy('createdAt', 'desc'), limit(maxRows))
-        : query(colRef, where('ownerId', '==', user.uid), limit(maxRows));
+      // Hindari composite index (where + orderBy) agar pengguna staf non-primary tidak gagal query
+      return query(colRef, where('ownerId', '==', user.uid), limit(maxRows));
+    };
+
+    const onListenerError = (colName: string) => (err: unknown) => {
+      console.error(`Firestore listener error (${colName}):`, err);
+      setDataLoading(false);
     };
 
     const usersQuery = isPrimary
@@ -169,7 +173,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           );
           setDataLoading(false);
         },
-        (err) => handleFirestoreError(err, OperationType.LIST, 'site_settings')
+        onListenerError('site_settings')
       )
     );
 
@@ -177,7 +181,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
       onSnapshot(
         makeQuery('news', true, 60),
         (snap) => setNews(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<NewsItem, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'news')
+        onListenerError('news')
       )
     );
 
@@ -186,7 +190,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
         makeQuery('programs', false, 30),
         (snap) =>
           setPrograms(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<StudyProgram, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'programs')
+        onListenerError('programs')
       )
     );
 
@@ -195,7 +199,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
         makeQuery('articles', true, 60),
         (snap) =>
           setArticles(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<EditorialArticle, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'articles')
+        onListenerError('articles')
       )
     );
 
@@ -204,7 +208,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
         makeQuery('ptk_members', false, 100),
         (snap) =>
           setPtkMembers(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PtkMember, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'ptk_members')
+        onListenerError('ptk_members')
       )
     );
 
@@ -215,7 +219,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           setAcademicEvents(
             snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AcademicEvent, 'id'>) }))
           ),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'academic_events')
+        onListenerError('academic_events')
       )
     );
 
@@ -223,7 +227,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
       onSnapshot(
         makeQuery('faqs', false, 50),
         (snap) => setFaqs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<FaqItem, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'faqs')
+        onListenerError('faqs')
       )
     );
 
@@ -234,7 +238,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           setPpdbList(
             snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PpdbRegistration, 'id'>) }))
           ),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'ppdb_registrations')
+        onListenerError('ppdb_registrations')
       )
     );
 
@@ -243,7 +247,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
         usersQuery,
         (snap) =>
           setUsersList(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<UserProfile, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'users')
+        onListenerError('users')
       )
     );
 
@@ -254,7 +258,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           setDailyMetrics(
             snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AnalyticsDaily, 'id'>) }))
           ),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'analytics_daily')
+        onListenerError('analytics_daily')
       )
     );
 
@@ -265,7 +269,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
           setLiveEvents(
             snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AnalyticsEvent, 'id'>) }))
           ),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'analytics_events')
+        onListenerError('analytics_events')
       )
     );
 
@@ -274,7 +278,7 @@ function AdminConsole({ onOpenPortal }: AdminConsoleProps) {
         makeQuery('audit_logs', true, 40),
         (snap) =>
           setAuditLogs(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditLog, 'id'>) }))),
-        (err) => handleFirestoreError(err, OperationType.LIST, 'audit_logs')
+        onListenerError('audit_logs')
       )
     );
 

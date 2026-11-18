@@ -9,6 +9,7 @@ import {
   Lock,
   LogIn,
   LogOut,
+  RefreshCw,
   Search,
   Users,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import {
 import {
   extractYouTubeId,
   fetchPtkDirectory,
+  getCachedPtkDirectory,
   isExternalBlockedForIframe,
   lookupUkkResult,
 } from '../services/schoolApi';
@@ -90,9 +92,10 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
   const [ukkError, setUkkError] = useState<string | null>(null);
   const [ukkResult, setUkkResult] = useState<UkkLookupResponse | null>(null);
 
-  // PTK Directory state
-  const [ptkList, setPtkList] = useState<PtkMember[]>([]);
+  // PTK Directory state (prioritaskan Google Spreadsheet sekolah)
+  const [ptkList, setPtkList] = useState<PtkMember[]>(() => getCachedPtkDirectory());
   const [ptkLoading, setPtkLoading] = useState(false);
+  const [ptkFetchedOnce, setPtkFetchedOnce] = useState(false);
   const [ptkError, setPtkError] = useState<string | null>(null);
   const [ptkQuery, setPtkQuery] = useState('');
   const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
@@ -129,10 +132,14 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
     setPtkError(null);
     try {
       const data = await fetchPtkDirectory();
-      setPtkList(data);
+      if (data.length > 0) {
+        setPtkList(data);
+      }
+      setPtkFetchedOnce(true);
     } catch {
-      if (firestorePtk.length === 0) {
-        setPtkError('Direktori PTK sementara tidak dapat dimuat dari server.');
+      setPtkFetchedOnce(true);
+      if (ptkList.length === 0 && firestorePtk.length === 0) {
+        setPtkError('Direktori PTK sementara tidak dapat dimuat dari Google Spreadsheet.');
       }
     } finally {
       setPtkLoading(false);
@@ -140,7 +147,7 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
   };
 
   useEffect(() => {
-    if (activeTab === 'ptk' && ptkList.length === 0 && !ptkLoading && !ptkError) {
+    if (activeTab === 'ptk' && !ptkFetchedOnce && !ptkLoading) {
       loadPtk();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,7 +234,28 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
     setCurrentUserName('');
   };
 
-  const combinedPtk = firestorePtk.length > 0 ? firestorePtk : ptkList;
+  const PLACEHOLDER_PTK_NAMES = new Set([
+    'kepala sekolah smk pgri 2 kedondong',
+    'waka bidang kurikulum',
+    'ketua program keahlian tkr',
+    'ketua program keahlian tsm',
+    'ketua program keahlian tkj',
+    'ketua program keahlian tav',
+    'ketua program bisnis digital',
+    'kepala tata usaha',
+  ]);
+
+  const combinedPtk: PtkMember[] = (() => {
+    if (ptkList.length === 0) {
+      return firestorePtk;
+    }
+    const existingNames = new Set(ptkList.map((m) => m.Nama.trim().toLowerCase()));
+    const customExtras = firestorePtk.filter((m) => {
+      const normalized = m.Nama.trim().toLowerCase();
+      return !PLACEHOLDER_PTK_NAMES.has(normalized) && !existingNames.has(normalized);
+    });
+    return [...ptkList, ...customExtras];
+  })();
 
   const filteredPtk = combinedPtk.filter((m) => {
     const q = ptkQuery.toLowerCase().trim();
@@ -547,19 +575,35 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({
                     Direktori Pendidik &amp; Tenaga Kependidikan (PTK)
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    Daftar resmi guru dan tenaga kependidikan SMK PGRI 2 Kedondong.
+                    Daftar resmi guru dan tenaga kependidikan SMK PGRI 2 Kedondong
+                    {ptkList.length > 0
+                      ? ` · Sinkron Google Spreadsheet (${combinedPtk.length} GTK)`
+                      : '.'}
                   </p>
                 </div>
-                <div className="relative w-full sm:w-72">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="search"
-                    value={ptkQuery}
-                    onChange={(e) => setPtkQuery(e.target.value)}
-                    placeholder="Cari nama atau jabatan..."
-                    aria-label="Cari nama atau jabatan PTK"
-                    className="w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-700 focus:outline-none"
-                  />
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                  <div className="relative flex-1 sm:w-72">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={ptkQuery}
+                      onChange={(e) => setPtkQuery(e.target.value)}
+                      placeholder="Cari nama atau jabatan..."
+                      aria-label="Cari nama atau jabatan PTK"
+                      className="w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-700 focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={loadPtk}
+                    disabled={ptkLoading}
+                    title="Muat ulang data dari Google Spreadsheet PTK"
+                    aria-label="Muat ulang data PTK dari Spreadsheet"
+                    className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${ptkLoading ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">Sinkron</span>
+                  </button>
                 </div>
               </div>
 

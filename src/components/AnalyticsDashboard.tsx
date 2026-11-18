@@ -211,7 +211,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             Database Portal SMK PGRI 2 Kedondong Masih Kosong
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Muat data awal resmi portal PRIDA (5 Program Keahlian, Berita, Artikel Literasi, PTK, Kalender, PPDB, dan metrik analitik) ke Firestore dalam satu klik.
+            Muat data awal resmi portal PRIDA (5 Program Keahlian, Berita, Artikel Literasi, Kalender, PPDB, dan metrik analitik) ke Firestore dalam satu klik. Data PTK utama diambil langsung dari Google Spreadsheet sekolah.
           </p>
         </div>
         <button

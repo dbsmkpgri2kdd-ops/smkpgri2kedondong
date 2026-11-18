@@ -64,6 +64,36 @@ export async function fetchPortalItems(): Promise<DynamicPortalItem[]> {
   }
 }
 
+const PTK_CACHE_KEY = 'prida_ptk_directory_cache_v1';
+
+function normalizePtkList(payload: unknown): PtkMember[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((raw) => {
+      const row = (raw ?? {}) as Record<string, unknown>;
+      const nama = String(row.Nama || row.nama || row.name || '').trim();
+      const jabatan = String(row.Jabatan || row.jabatan || row.position || 'Guru / Staf Sekolah').trim();
+      const foto = row.Foto || row.foto || row.photo;
+      if (!nama) return null;
+      return {
+        Nama: nama,
+        Jabatan: jabatan,
+        Foto: foto ? String(foto).trim() : undefined,
+      } as PtkMember;
+    })
+    .filter((item): item is PtkMember => item !== null);
+}
+
+export function getCachedPtkDirectory(): PtkMember[] {
+  try {
+    const raw = localStorage.getItem(PTK_CACHE_KEY);
+    if (!raw) return [];
+    return normalizePtkList(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchPtkDirectory(): Promise<PtkMember[]> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 10000);
@@ -75,7 +105,13 @@ export async function fetchPtkDirectory(): Promise<PtkMember[]> {
       throw new Error(`HTTP ${res.status}`);
     }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    const normalized = normalizePtkList(data);
+    try {
+      localStorage.setItem(PTK_CACHE_KEY, JSON.stringify(normalized));
+    } catch {
+      // Ignore storage quota or privacy restrictions
+    }
+    return normalized;
   } finally {
     window.clearTimeout(timeout);
   }
